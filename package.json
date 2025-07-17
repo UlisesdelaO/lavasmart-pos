@@ -1,0 +1,40 @@
+{
+  "name": "lavasmart-pos",
+  "version": "1.0.0",
+  "description": "Sistema de Punto de Venta (POS) moderno desarrollado con Google Apps Script para servicios de lavado y limpieza",
+  "main": "Code.js",
+  "scripts": {
+    "deploy": "clasp push && clasp deploy",
+    "push": "clasp push",
+    "pull": "clasp pull",
+    "open": "clasp open",
+    "logs": "clasp logs",
+    "version": "clasp version",
+    "deployments": "clasp deployments"
+  },
+  "keywords": [
+    "pos",
+    "point-of-sale",
+    "google-apps-script",
+    "google-sheets",
+    "lavado",
+    "limpieza",
+    "lavasmart"
+  ],
+  "author": "Lavasmart",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/UlisesdelaO/lavasmart-pos.git"
+  },
+  "bugs": {
+    "url": "https://github.com/UlisesdelaO/lavasmart-pos/issues"
+  },
+  "homepage": "https://github.com/UlisesdelaO/lavasmart-pos#readme",
+  "devDependencies": {
+    "@google/clasp": "^2.4.2"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+} 
