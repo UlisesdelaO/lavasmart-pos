@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reportes - Lavasmart</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css" />
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <?!= include("styles-css"); ?>
+</head>
+<body>
+  <header>
+    <h1><i class="fas fa-chart-line"></i> Reportes Lavasmart</h1>
+    <div class="nav-buttons">
+      <button id="ir-a-pos" class="nav-btn"><i class="fas fa-cash-register"></i> Ir al POS</button>
+      <button id="ir-a-calendario" class="nav-btn"><i class="fas fa-calendar-alt"></i> Calendario</button>
+    </div>
+  </header>
+  
+  <div class="reports-container">
+    <!-- Filtros y opciones de fecha -->
+    <div class="report-section">
+      <div class="report-filters">
+        <div class="filter-item">
+          <label for="filter-date-from">Desde:</label>
+          <input type="date" id="filter-date-from" class="form-control">
+        </div>
+        <div class="filter-item">
+          <label for="filter-date-to">Hasta:</label>
+          <input type="date" id="filter-date-to" class="form-control">
+        </div>
+        <button id="aplicar-filtro" class="report-btn"><i class="fas fa-filter"></i> Aplicar Filtro</button>
+        <button id="resetear-filtro" class="report-btn"><i class="fas fa-sync-alt"></i> Resetear</button>
+      </div>
+    </div>
+    
+    <!-- Dashboard con estadísticas -->
+    <div class="report-section">
+      <h2><i class="fas fa-tachometer-alt"></i> Dashboard</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <h3>Ventas Totales</h3>
+          <p id="ventas-mes">Cargando...</p>
+        </div>
+        <div class="stat-card">
+          <h3>Ingresos Totales</h3>
+          <p id="ingresos-mes">Cargando...</p>
+        </div>
+        <div class="stat-card">
+          <h3>Método de Pago Principal</h3>
+          <p id="metodo-pago-principal">Cargando...</p>
+        </div>
+        <div class="stat-card">
+          <h3>Promedio por Venta</h3>
+          <p id="promedio-venta">Cargando...</p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Generación de reportes -->
+    <div class="report-section">
+      <h2><i class="fas fa-file-alt"></i> Generación de Reportes</h2>
+      
+      <div class="report-form">
+        <div class="form-group">
+          <label for="mes">Mes:</label>
+          <select id="mes" class="form-control">
+            <option value="1">Enero</option>
+            <option value="2">Febrero</option>
+            <option value="3">Marzo</option>
+            <option value="4">Abril</option>
+            <option value="5">Mayo</option>
+            <option value="6">Junio</option>
+            <option value="7">Julio</option>
+            <option value="8">Agosto</option>
+            <option value="9">Septiembre</option>
+            <option value="10">Octubre</option>
+            <option value="11">Noviembre</option>
+            <option value="12">Diciembre</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="anio">Año:</label>
+          <input type="number" id="anio" class="form-control" min="2020" max="2100">
+        </div>
+        
+        <div class="form-group">
+          <label>&nbsp;</label>
+          <button id="generar-reporte" class="report-btn"><i class="fas fa-file-export"></i> Generar Reporte</button>
+        </div>
+      </div>
+      
+      <div id="reporte-resultado" class="report-result">
+        <!-- Aquí se mostrará el resultado del reporte -->
+      </div>
+    </div>
+    
+    <!-- Productos más vendidos -->
+    <div class="report-section">
+      <h2><i class="fas fa-trophy"></i> Productos Más Vendidos</h2>
+      <div id="productos-mas-vendidos">
+        <div class="loading"></div> Cargando productos más vendidos...
+      </div>
+    </div>
+    
+    <!-- Ventas por día (gráfico) -->
+    <div class="report-section">
+      <h2><i class="fas fa-calendar-alt"></i> Ventas por Día</h2>
+      <div id="ventas-por-dia">
+        <div class="loading"></div> Cargando gráfico de ventas...
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // Inicializar fecha actual para filtros
+    const hoy = new Date();
+    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    const finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+    
+    document.getElementById('filter-date-from').valueAsDate = inicioMes;
+    document.getElementById('filter-date-to').valueAsDate = finMes;
+    document.getElementById('anio').value = hoy.getFullYear();
+    document.getElementById('mes').value = hoy.getMonth() + 1;
+    
+    // Cargar datos al iniciar con el filtro por defecto (mes actual)
+    cargarDatosReporte(
+      formatDateForApi(inicioMes),
+      formatDateForApi(finMes)
+    );
+    
+    // Event Listeners
+    document.getElementById('aplicar-filtro').addEventListener('click', function() {
+      const desde = document.getElementById('filter-date-from').valueAsDate;
+      const hasta = document.getElementById('filter-date-to').valueAsDate;
+      
+      if (!desde || !hasta) {
+        mostrarError('Seleccione fechas válidas para el filtro');
+        return;
+      }
+      
+      if (desde > hasta) {
+        mostrarError('La fecha inicial debe ser anterior a la fecha final');
+        return;
+      }
+      
+      cargarDatosReporte(
+        formatDateForApi(desde),
+        formatDateForApi(hasta)
+      );
+    });
+    
+    document.getElementById('resetear-filtro').addEventListener('click', function() {
+      document.getElementById('filter-date-from').valueAsDate = inicioMes;
+      document.getElementById('filter-date-to').valueAsDate = finMes;
+      
+      cargarDatosReporte(
+        formatDateForApi(inicioMes),
+        formatDateForApi(finMes)
+      );
+    });
+    
+    document.getElementById('generar-reporte').addEventListener('click', function() {
+      const mes = document.getElementById('mes').value;
+      const anio = document.getElementById('anio').value;
+      const resultadoDiv = document.getElementById('reporte-resultado');
+      
+      resultadoDiv.innerHTML = '<div class="loading"></div> Generando reporte...';
+      resultadoDiv.classList.add('show');
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            resultadoDiv.innerHTML = `
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-check-circle" style="color: var(--success); font-size: 24px;"></i>
+                <div>
+                  <p>Reporte generado exitosamente</p>
+                  <p><a href="${result.url}" target="_blank">
+                    <i class="fas fa-external-link-alt"></i> Abrir reporte: ${result.hoja}
+                  </a></p>
+                </div>
+              </div>`;
+          } else {
+            resultadoDiv.innerHTML = `
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-exclamation-triangle" style="color: var(--danger); font-size: 24px;"></i>
+                <p>Error: ${result.error}</p>
+              </div>`;
+          }
+        })
+        .withFailureHandler(function(error) {
+          resultadoDiv.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <i class="fas fa-exclamation-triangle" style="color: var(--danger); font-size: 24px;"></i>
+              <p>Error: ${error}</p>
+            </div>`;
+        })
+        .crearReporteMensual(mes, anio);
+    });
+    
+    document.getElementById('ir-a-pos').addEventListener('click', function() {
+      window.top.location.href = '<?= ScriptApp.getService().getUrl() ?>';
+    });
+    document.getElementById('ir-a-calendario').addEventListener('click', function() {
+      window.top.location.href = '<?= ScriptApp.getService().getUrl() ?>?mode=calendar';
+    });
+    
+    // Funciones auxiliares
+    function cargarDatosReporte(fechaInicio, fechaFin) {
+      // Mostrar indicadores de carga
+      document.getElementById('ventas-mes').innerHTML = '<div class="loading"></div>';
+      document.getElementById('ingresos-mes').innerHTML = '<div class="loading"></div>';
+      document.getElementById('metodo-pago-principal').innerHTML = '<div class="loading"></div>';
+      document.getElementById('promedio-venta').innerHTML = '<div class="loading"></div>';
+      document.getElementById('productos-mas-vendidos').innerHTML = '<div class="loading"></div> Cargando productos más vendidos...';
+      document.getElementById('ventas-por-dia').innerHTML = '<div class="loading"></div> Cargando gráfico de ventas...';
+      
+      google.script.run
+        .withSuccessHandler(mostrarDatosReportes)
+        .withFailureHandler(mostrarError)
+        .generarReportePeriodo(fechaInicio, fechaFin);
+    }
+    
+    function mostrarDatosReportes(data) {
+      if (!data.success) {
+        mostrarError(data.error || 'Error al cargar los datos');
+        return;
+      }
+      
+      // Mostrar estadísticas principales
+      if (data.estadisticas) {
+        document.getElementById('ventas-mes').textContent = 
+          formatearDinero(data.estadisticas.totalVentas);
+        
+        document.getElementById('ingresos-mes').textContent = 
+          formatearDinero(data.estadisticas.totalIngresos);
+        
+        document.getElementById('promedio-venta').textContent = 
+          formatearDinero(data.estadisticas.promedioVenta);
+        
+        // Determinar método de pago principal
+        const metodoPago = data.estadisticas.porMetodoPago;
+        let metodoPrincipal = metodoPago.efectivo >= metodoPago.tarjeta ? 
+          'Efectivo' : 'Tarjeta';
+        
+        document.getElementById('metodo-pago-principal').textContent = 
+          metodoPrincipal + ' (' + 
+          formatearDinero(Math.max(metodoPago.efectivo, metodoPago.tarjeta)) + ')';
+        
+        // Mostrar productos más vendidos
+        mostrarProductosMasVendidos(data.estadisticas.productosMasVendidos);
+        
+        // Mostrar ventas por día
+        mostrarVentasPorDia(data.estadisticas.ventasPorDia);
+      }
+    }
+    
+    function mostrarProductosMasVendidos(productos) {
+      if (!productos || productos.length === 0) {
+        document.getElementById('productos-mas-vendidos').innerHTML = 
+          '<p>No hay datos de productos para mostrar en el período seleccionado.</p>';
+        return;
+      }
+      
+      let html = `
+        <table class="ordenes-table">
+          <thead>
+            <tr>
+              <th>SKU</th>
+              <th>Cantidad</th>
+            </tr>
+          </thead>
+          <tbody>`;
+      
+      productos.forEach(producto => {
+        html += `
+          <tr>
+            <td>${producto.sku}</td>
+            <td>${producto.cantidad}</td>
+          </tr>`;
+      });
+      
+      html += `
+          </tbody>
+        </table>`;
+      
+      document.getElementById('productos-mas-vendidos').innerHTML = html;
+    }
+    
+    function mostrarVentasPorDia(ventasPorDia) {
+      if (!ventasPorDia || Object.keys(ventasPorDia).length === 0) {
+        document.getElementById('ventas-por-dia').innerHTML = 
+          '<p>No hay datos de ventas por día para mostrar en el período seleccionado.</p>';
+        return;
+      }
+      
+      let html = `
+        <table class="ordenes-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Ventas</th>
+            </tr>
+          </thead>
+          <tbody>`;
+      
+      // Ordenar fechas
+      const fechasOrdenadas = Object.keys(ventasPorDia).sort((a, b) => {
+        return new Date(a) - new Date(b);
+      });
+      
+      fechasOrdenadas.forEach(fecha => {
+        html += `
+          <tr>
+            <td>${formatearFecha(fecha)}</td>
+            <td>${formatearDinero(ventasPorDia[fecha])}</td>
+          </tr>`;
+      });
+      
+      html += `
+          </tbody>
+        </table>`;
+      
+      document.getElementById('ventas-por-dia').innerHTML = html;
+    }
+    
+    // Formatear números como moneda
+    function formatearDinero(valor) {
+      if (isNaN(valor)) return '$0.00';
+      return '$' + parseFloat(valor).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+    }
+    
+    // Formatear fecha para mostrar
+    function formatearFecha(fechaStr) {
+      const fecha = new Date(fechaStr);
+      return fecha.toLocaleDateString('es-MX', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    }
+    
+    // Formatear fecha para API
+    function formatDateForApi(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    
+    // Manejar errores
+    function mostrarError(error) {
+      alert('Error: ' + error);
+    }
+  </script>
+</body>
+</html> 

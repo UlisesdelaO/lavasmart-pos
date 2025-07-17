@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css" />
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Libre+Barcode+128&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <?!= include("styles-css"); ?>
+    <title>POS Lavasmart</title>
+</head>
+<body style="background: #fdeeee;">
+  <div class="pos-root-layout">
+    <!-- Sidebar vertical solo iconos -->
+    <aside class="sidebar-vertical">
+      <button class="sidebar-icon" title="POS"><i class="fas fa-store"></i></button>
+      <button class="sidebar-icon" title="Órdenes"><i class="fas fa-list-alt"></i></button>
+      <button class="sidebar-icon" title="Calendario"><i class="fas fa-calendar-alt"></i></button>
+      <button class="sidebar-icon" title="Reportes"><i class="fas fa-chart-bar"></i></button>
+      <button class="sidebar-icon" title="Ajustes"><i class="fas fa-cog"></i></button>
+    </aside>
+    <!-- Panel central -->
+    <main class="main-panel">
+      <header class="main-header">
+        <div class="search-bar search-bar-main">
+          <i class="fas fa-search"></i>
+          <input type="text" id="search-product" placeholder="Buscar producto...">
+        </div>
+        <div class="user-profile">
+          <img src="https://randomuser.me/api/portraits/lego/1.jpg" alt="Usuario" class="user-avatar">
+          <span class="user-name">Lavasmart</span>
+        </div>
+      </header>
+      <section class="categories-bar">
+        <button class="category-btn active" data-category="all"><i class="fas fa-th-large"></i></button>
+        <button class="category-btn" data-category="Salas"><i class="fas fa-couch"></i></button>
+        <button class="category-btn" data-category="Colchones"><i class="fas fa-bed"></i></button>
+        <button class="category-btn" data-category="Vehículos"><i class="fas fa-car"></i></button>
+        <button class="category-btn" data-category="Alfombras y Tapetes"><i class="fas fa-border-all"></i></button>
+        <button class="category-btn" data-category="Otros"><i class="fas fa-box"></i></button>
+        <button class="category-btn" data-category="Descuentos"><i class="fas fa-tags"></i></button>
+        <button class="category-btn" data-category="Promociones"><i class="fas fa-gift"></i></button>
+      </section>
+      <section class="products-grid" id="menu">
+        <!-- Aquí van los productos (cards) -->
+      </section>
+    </main>
+    <!-- Panel derecho: recibo y totales -->
+    <aside class="right-panel">
+      <div class="receipt-panel">
+        <div class="receipt-header-modern">
+          <div class="receipt-title-row">
+            <h3 class="receipt-title">Recibo</h3>
+            <span class="receipt-invoice" id="invoice-number"></span>
+          </div>
+          <div class="receipt-meta">
+            <span id="receipt-date"></span>
+          </div>
+        </div>
+        <div class="receipt-table-modern">
+          <div class="receipt-table-header">
+            <span class="rth-desc">Descripción</span>
+            <span class="rth-qty">Cant.</span>
+            <span class="rth-unit">P. Unit.</span>
+            <span class="rth-sub">Subtotal</span>
+            <span class="rth-del"></span>
+          </div>
+          <ul class="receipt-list" id="receipt-details">
+            <!-- Items del recibo -->
+          </ul>
+        </div>
+        <div class="receipt-summary-modern">
+          <div class="receipt-row"><span>Subtotal</span><span id="subtotal-summary">$0.00</span></div>
+          <div class="receipt-row"><span>Descuento</span><span id="discount-summary">$0.00</span></div>
+          <div class="receipt-row"><span>IVA</span><span id="tax-summary">$0.00</span></div>
+          <div class="receipt-row total"><span>Total</span><span id="grandtotal-summary">$0.00</span></div>
+        </div>
+        <div class="payment-method-panel">
+          <span class="payment-title">Método de pago</span>
+          <div class="payment-methods">
+            <button class="payment-btn" id="pay-cash">Efectivo</button>
+            <button class="payment-btn active" id="pay-card">Tarjeta</button>
+          </div>
+        </div>
+        <button class="main-action-btn" id="close-sale">Cerrar Venta</button>
+      </div>
+    </aside>
+  </div>
+  <!-- Loader inicial -->
+  <div id="initial-loader" style="position:fixed;z-index:2000;top:0;left:0;width:100vw;height:100vh;background:rgba(255,255,255,0.95);display:flex;align-items:center;justify-content:center;">
+    <div style="display:flex;flex-direction:column;align-items:center;">
+      <div class="loader-spinner" style="border:6px solid #f3f3f3;border-top:6px solid #ff6384;border-radius:50%;width:60px;height:60px;animation:spin 1s linear infinite;"></div>
+      <span style="margin-top:18px;font-size:1.2em;color:#ff6384;">Cargando sistema...</span>
+    </div>
+  </div>
+  <style>
+    @keyframes spin { 0% { transform: rotate(0deg);} 100% { transform: rotate(360deg);} }
+  </style>
+  <?!= include("script-js"); ?>
+</body>
+</html>

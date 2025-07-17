@@ -1,0 +1,1131 @@
+<script>
+    // close sale  and save/send data
+  
+  class Order {
+      constructor() {
+          this._menu = [];
+          this._previousSales = [];
+          this._invoiceNumber = "";
+          this._order = [];
+          this._payment = {
+              amountPaid: 0,
+              type: "",
+              changeTip: 0
+          };
+          this._isReady = false;
+      }
+  
+      get menu() {
+          return this._menu;
+      }
+  
+      set menu(menuArray) {
+          this._menu = [];
+          console.log('[DEBUG] menuArray recibido:', menuArray);
+          menuArray.forEach(menuItem => {
+              // Soporta arrays de longitud variable y fallback seguro
+              let currItem = {};
+              currItem.sku = menuItem[0] || '';
+              currItem.description = menuItem[1] || '';
+              currItem.price = menuItem[2] || 0;
+              currItem.taxRate = menuItem[3] || 0;
+              currItem.image = menuItem[4] || '';
+              currItem.tiempo = menuItem[5] || 0;
+              // Nombre de archivo y precio ideal pueden omitirse
+              currItem.category = menuItem[8] || menuItem[6] || 'Otros';
+              this._menu.push(currItem);
+          });
+          console.log('[DEBUG] this._menu procesado:', this._menu);
+      }
+  
+      get previousSales() {
+          return this._previousSales;
+      }
+  
+      set previousSales(salesData) {
+          this._previousSales = salesData;
+      }
+  
+      get invoiceNumber() {
+          return this._invoiceNumber;
+      }
+  
+      set invoiceNumber(num) {
+          this._invoiceNumber = num.toString();
+      }
+  
+      get order() {
+          return this._order;
+      }
+  
+      set order(data) {
+          this._order = data;
+      }
+  
+      get payment() {
+          return this._payment;
+      }
+  
+      set payment(payment) {
+          this._payment = payment;
+      }
+  
+      get isReady() {
+          return this._isReady;
+      }
+  
+      async initialize() {
+          try {
+              await this.generateInvoiceNumber();
+              this._isReady = true;
+              document.querySelectorAll('.product-card').forEach(button => {
+                  if (button) button.classList.remove('disabled');
+              });
+              const clearOrderBtn = document.getElementById('clear-order');
+              if (clearOrderBtn) clearOrderBtn.classList.remove('disabled');
+              document.querySelectorAll('.paypad-show').forEach(button => {
+                  if (button) button.classList.remove('disabled');
+              });
+          } catch (error) {
+              console.error('Error al inicializar orden:', error);
+              showMessage('Error al generar número de orden. Por favor, recargue la página.', 'error');
+          }
+      }
+  
+      async generateInvoiceNumber() {
+          try {
+              const result = await new Promise((resolve, reject) => {
+                  google.script.run
+                      .withSuccessHandler(resolve)
+                      .withFailureHandler(reject)
+                      .getUltimasOrdenes();
+              });
+              let invoiceNumber;
+              if (!result || !result.length) {
+                  const timestamp = new Date().getTime();
+                  const baseNumber = 1;
+                  invoiceNumber = `${baseNumber}-${timestamp}`;
+              } else {
+                  const timestamp = new Date().getTime();
+                  const highestNumber = Math.max(...result.map(row => {
+                      const num = row[1].split('-')[0];
+                      return parseInt(num, 10);
+                  }));
+                  invoiceNumber = `${highestNumber + 1}-${timestamp}`;
+              }
+              const invoiceNumberEl = document.getElementById('invoice-number');
+              if (invoiceNumberEl) invoiceNumberEl.textContent = `Invoice# ${invoiceNumber}`;
+              return invoiceNumber;
+          } catch (error) {
+              console.error('Error al generar número de factura:', error);
+              const invoiceNumberEl = document.getElementById('invoice-number');
+              if (invoiceNumberEl) invoiceNumberEl.textContent = 'Error al generar número de factura';
+              throw error;
+          }
+      }
+  
+      addOrderLine(quantity, data) {
+          if (!this._isReady) {
+              showMessage('Por favor espere mientras se genera el número de orden', 'warning');
+              return;
+          }
+          
+          let lineData = JSON.parse(data);
+          
+          // Verificar si ya existe un ítem con el mismo SKU
+          const existingItemIndex = this.order.findIndex(item => item.sku === lineData.sku);
+          
+          if (existingItemIndex !== -1) {
+              // Si existe, incrementar la cantidad
+              this.updateItemQuantity(existingItemIndex, this.order[existingItemIndex].quantity + quantity);
+          } else {
+              // Si no existe, crear nueva línea
+              let currentLine = {};
+              currentLine.sku = lineData.sku;
+              currentLine.description = lineData.description;
+              currentLine.tiempo = Utilities.roundToTwo(lineData.tiempo);
+              currentLine.quantity = quantity;
+              currentLine.price = Utilities.roundToTwo(parseFloat(lineData.price));
+              currentLine.subtotal = currentLine.quantity * currentLine.price;
+              currentLine.tax = Utilities.roundToTwo(lineData.taxRate * currentLine.subtotal);
+          
+              this.order.push(currentLine);
+              Ui.receiptDetails(this);
+          }
+      }
+      
+      updateItemQuantity(index, newQuantity) {
+          // Asegurar que la cantidad sea un número válido
+          newQuantity = parseInt(newQuantity) || 1;
+          
+          // Actualizar cantidad (mínimo 1)
+          newQuantity = Math.max(1, newQuantity);
+          
+          this.order[index].quantity = newQuantity;
+          this.order[index].subtotal = newQuantity * this.order[index].price;
+          this.order[index].tax = Utilities.roundToTwo(this.order[index].subtotal * (this.order[index].tax / (this.order[index].subtotal / this.order[index].price)));
+          
+          Ui.receiptDetails(this);
+      }
+  
+      deleteOrderLine(index) {
+          this.order.splice(index, 1);
+          Ui.receiptDetails(this)
+      }
+  
+      clearOrder() {
+          this.order = [];
+  
+          Ui.receiptDetails(this);
+      }
+      getSummary() {
+          const summary = {
+              subtotal: 0,
+              tiempo: 0,
+              tax: 0,
+              grandtotal: 0
+          }
+  
+          this.order.forEach(orderLine => {
+              summary.subtotal += orderLine.subtotal;
+              summary.tax += orderLine.tax;
+              summary.tiempo += orderLine.tiempo;
+          })
+  
+          summary.grandtotal = summary.subtotal + summary.tax;
+  
+          return summary;
+      }
+  
+      changePayment(input) {
+          const orderGrandTotal = this.getSummary().grandtotal;
+          if (input.amountPaid != null) this.payment.amountPaid = parseFloat(input.amountPaid);
+          if (input.type != null) this.payment.type = input.type;
+          if (this.payment.amountPaid >= orderGrandTotal) {
+              this.payment.changeTip = this.payment.amountPaid - orderGrandTotal;
+              Ui.closeButton(false);
+          } else {
+              this.payment.changeTip = 0;
+              Ui.closeButton(true)
+          }
+  
+          Ui.paymentSummary(this);
+      }
+  
+      clearPayment() {
+          this.payment = {
+              amountPaid: 0,
+              type: "",
+              changeTip: 0
+          };
+  
+          Ui.paymentSummary(this);
+      }
+  
+      exportOrder(date) {
+        let exportData = [];
+  
+          this.order.forEach(orderLine => {
+              let currentLine = [];
+              currentLine[0] = date;
+              currentLine[1] = this.invoiceNumber;
+              currentLine[2] = orderLine.sku;
+              currentLine[3] = orderLine.quantity;
+              currentLine[4] = orderLine.price;
+              currentLine[5] = orderLine.tax;
+  
+              exportData.push(currentLine);
+              this.previousSales.push(currentLine);
+          })
+  
+          return exportData;
+      }
+  
+      exportPayment(date) {
+          const currentPayment = [[]];
+          const tipChange = Utilities.roundToTwo(this.payment.amountPaid - this.getSummary().grandtotal);
+  
+          currentPayment[0][0] = date;
+          currentPayment[0][1] = this.invoiceNumber;
+          currentPayment[0][2] = this.getSummary().grandtotal;
+          currentPayment[0][3] = this.payment.type;
+  
+          if (this.payment.type == "cash") {
+              currentPayment[0][4] = 0;
+          } else {
+              currentPayment[0][4] = tipChange;
+          }
+          return currentPayment;
+      }
+  
+      closeSale() {
+          if (!this._isReady) {
+              showMessage('Por favor espere mientras se genera el número de orden', 'warning');
+              return;
+          }
+          
+          if (!this._invoiceNumber) {
+              showMessage('Error: No hay número de orden disponible', 'error');
+              return;
+          }
+  
+          const date = new Date();
+          const orderData = this.exportOrder(date);
+          const paymentData = this.exportPayment(date);
+          const exportData = {
+            order : orderData,
+            payment: paymentData
+          }
+  
+          Ui.hidePaypad(this);
+          this.clearPayment();
+          this.clearOrder();
+          this.initialize();
+  
+          google.script.run
+              .withSuccessHandler(function(result) {
+                  if (result.success) {
+                      showMessage('Venta completada exitosamente', 'success');
+                  } else {
+                      showMessage('Error al guardar la venta: ' + result.error, 'error');
+                  }
+              })
+              .withFailureHandler(function(error) {
+                  showMessage('Error al procesar la venta: ' + error, 'error');
+              })
+              .setData(JSON.stringify(exportData));
+      }
+  }
+  
+  class Ui {
+  
+      static menu(orderInstance) {
+          let frag = document.createDocumentFragment();
+          if (!orderInstance.menu || orderInstance.menu.length === 0) {
+              const emptyMsg = document.createElement('div');
+              emptyMsg.className = 'empty-state';
+              emptyMsg.textContent = 'No hay productos disponibles.';
+              document.getElementById('menu').innerHTML = '';
+              document.getElementById('menu').appendChild(emptyMsg);
+              return;
+          }
+          // Detectar si la categoría activa es 'all'
+          const categoryActiveBtn = document.querySelector('.category-btn.active');
+          const categoryActive = categoryActiveBtn ? (categoryActiveBtn.getAttribute('data-category') || 'all') : 'all';
+          if (categoryActive === 'all') {
+           // Definir orden de servicios
+           const serviciosOrden = ['Salas', 'Colchones', 'Vehículos', 'Alfombras y Tapetes', 'Otros'];
+           const promos = ['Promociones', 'Descuentos'];
+           // Renderizar servicios en orden fijo
+           serviciosOrden.forEach(servicio => {
+             orderInstance.menu.filter(item => item.category === servicio).forEach(item => {
+               let descripcion = item.description.length > 30 ? item.description.substring(0, 27) + '...' : item.description;
+               let menuElement = `
+                   <div class="product-card" data-category="${item.category || 'Otros'}" data-sku='${JSON.stringify({ 
+                       sku: item.sku, 
+                       description: item.description, 
+                       price: item.price, 
+                       taxRate: item.taxRate, 
+                       tiempo: item.tiempo, 
+                       image: item.image, 
+                       category: item.category || 'Otros' 
+                   })}'>
+                       <img src="${item.image}" alt="${item.description}" class="product-img">
+                       <div class="product-title" title="${item.description}">${descripcion}</div>
+                       <div class="product-price">${Utilities.convertFloatToString(item.price)}</div>
+                   </div>`;
+               let node = document.createElement("div");
+               node.innerHTML = menuElement;
+               let card = node.firstElementChild;
+               let addBtn = document.createElement('button');
+               addBtn.className = 'add-to-bill-btn';
+               addBtn.textContent = 'Agregar';
+               addBtn.addEventListener('click', (e) => {
+                   e.stopPropagation();
+                   orderInstance.addOrderLine(1, card.getAttribute("data-sku"));
+               });
+               card.appendChild(addBtn);
+               frag.appendChild(card);
+             });
+           });
+           // Luego promociones y descuentos
+           promos.forEach(promoCat => {
+             orderInstance.menu.filter(item => item.category === promoCat).forEach(item => {
+               let descripcion = item.description.length > 30 ? item.description.substring(0, 27) + '...' : item.description;
+               let menuElement = `
+                   <div class="product-card" data-category="${item.category || 'Otros'}" data-sku='${JSON.stringify({ 
+                       sku: item.sku, 
+                       description: item.description, 
+                       price: item.price, 
+                       taxRate: item.taxRate, 
+                       tiempo: item.tiempo, 
+                       image: item.image, 
+                       category: item.category || 'Otros' 
+                   })}'>
+                       <img src="${item.image}" alt="${item.description}" class="product-img">
+                       <div class="product-title" title="${item.description}">${descripcion}</div>
+                       <div class="product-price">${Utilities.convertFloatToString(item.price)}</div>
+                   </div>`;
+               let node = document.createElement("div");
+               node.innerHTML = menuElement;
+               let card = node.firstElementChild;
+               let addBtn = document.createElement('button');
+               addBtn.className = 'add-to-bill-btn';
+               addBtn.textContent = 'Agregar';
+               addBtn.addEventListener('click', (e) => {
+                   e.stopPropagation();
+                   orderInstance.addOrderLine(1, card.getAttribute("data-sku"));
+               });
+               card.appendChild(addBtn);
+               frag.appendChild(card);
+             });
+           });
+           // Finalmente, cualquier otro producto no categorizado
+           orderInstance.menu.filter(item => !serviciosOrden.includes(item.category) && !promos.includes(item.category)).forEach(item => {
+             let descripcion = item.description.length > 30 ? item.description.substring(0, 27) + '...' : item.description;
+             let menuElement = `
+                 <div class="product-card" data-category="${item.category || 'Otros'}" data-sku='${JSON.stringify({ 
+                     sku: item.sku, 
+                     description: item.description, 
+                     price: item.price, 
+                     taxRate: item.taxRate, 
+                     tiempo: item.tiempo, 
+                     image: item.image, 
+                     category: item.category || 'Otros' 
+                 })}'>
+                     <img src="${item.image}" alt="${item.description}" class="product-img">
+                     <div class="product-title" title="${item.description}">${descripcion}</div>
+                     <div class="product-price">${Utilities.convertFloatToString(item.price)}</div>
+                 </div>`;
+             let node = document.createElement("div");
+             node.innerHTML = menuElement;
+             let card = node.firstElementChild;
+             let addBtn = document.createElement('button');
+             addBtn.className = 'add-to-bill-btn';
+             addBtn.textContent = 'Agregar';
+             addBtn.addEventListener('click', (e) => {
+                 e.stopPropagation();
+                 orderInstance.addOrderLine(1, card.getAttribute("data-sku"));
+             });
+             card.appendChild(addBtn);
+             frag.appendChild(card);
+           });
+          } else {
+          orderInstance.menu.forEach(item => {
+              let descripcion = item.description.length > 30 ? item.description.substring(0, 27) + '...' : item.description;
+              let menuElement = `
+                  <div class="product-card" data-category="${item.category || 'Otros'}" data-sku='${JSON.stringify({ 
+                      sku: item.sku, 
+                      description: item.description, 
+                      price: item.price, 
+                      taxRate: item.taxRate, 
+                      tiempo: item.tiempo, 
+                      image: item.image, 
+                      category: item.category || 'Otros' 
+                  })}'>
+                      <img src="${item.image}" alt="${item.description}" class="product-img">
+                      <div class="product-title" title="${item.description}">${descripcion}</div>
+                      <div class="product-price">${Utilities.convertFloatToString(item.price)}</div>
+                  </div>`;
+              let node = document.createElement("div");
+              node.innerHTML = menuElement;
+              let card = node.firstElementChild;
+              // Si quieres mostrar la categoría en el card, descomenta la siguiente línea:
+              // card.innerHTML += `<div class='product-category'>${item.category}</div>`;
+              // Botón agregar
+              let addBtn = document.createElement('button');
+              addBtn.className = 'add-to-bill-btn';
+              addBtn.textContent = 'Agregar';
+              addBtn.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  orderInstance.addOrderLine(1, card.getAttribute("data-sku"));
+              });
+              card.appendChild(addBtn);
+              frag.appendChild(card);
+          });
+          }
+          const menuGrid = document.getElementById('menu');
+          menuGrid.innerHTML = '';
+          menuGrid.appendChild(frag);
+      }
+  
+      static receiptDetails(orderInstance) {
+          let frag = document.createDocumentFragment();
+          // Encabezado del ticket (ahora solo actualiza los elementos visuales)
+          const invoiceNumber = orderInstance.invoiceNumber || '';
+          const now = new Date();
+          const fechaHora = now.toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' });
+          const invoiceNumberEl = document.getElementById('invoice-number');
+          if (invoiceNumberEl) invoiceNumberEl.textContent = `# ${invoiceNumber}`;
+          const receiptDateEl = document.getElementById('receipt-date');
+          if (receiptDateEl) receiptDateEl.textContent = `Orden: ${fechaHora}`;
+
+          // Renderizar productos como filas de tabla
+          orderInstance.order.forEach((orderLine, index) => {
+              let receiptLine = `
+                  <li class="receipt-item" data-index="${index}">
+                      <div class="receipt-item-title">${orderLine.description}</div>
+                      <div class="receipt-item-qty">
+                          <button class="receipt-qty-btn quantity-minus" data-index="${index}">-</button>
+                          <span class="editable-quantity">${orderLine.quantity}</span>
+                          <button class="receipt-qty-btn quantity-plus" data-index="${index}">+</button>
+                      </div>
+                      <div class="receipt-item-price">${Utilities.convertFloatToString(orderLine.price)}</div>
+                      <div class="receipt-item-price">${Utilities.convertFloatToString(orderLine.subtotal)}</div>
+                      <button class="receipt-qty-btn delete" data-delete="${index}" title="Eliminar"><i class="fas fa-times"></i></button>
+                  </li>`;
+              let node = document.createElement("div");
+              node.innerHTML = receiptLine;
+              frag.appendChild(node.firstElementChild);
+          });
+          const receiptDetails = document.getElementById("receipt-details");
+          receiptDetails.innerHTML = '';
+          receiptDetails.appendChild(frag);
+          this.summary(orderInstance);
+          document.querySelectorAll('.quantity-plus').forEach(button => {
+              button.addEventListener('click', function() {
+                  const index = parseInt(this.getAttribute('data-index'));
+                  const currentQuantity = orderInstance.order[index].quantity;
+                  orderInstance.updateItemQuantity(index, currentQuantity + 1);
+              });
+          });
+          document.querySelectorAll('.quantity-minus').forEach(button => {
+              button.addEventListener('click', function() {
+                  const index = parseInt(this.getAttribute('data-index'));
+                  const currentQuantity = orderInstance.order[index].quantity;
+                  if (currentQuantity > 1) {
+                      orderInstance.updateItemQuantity(index, currentQuantity - 1);
+                  }
+              });
+          });
+          document.querySelectorAll('.delete').forEach(button => {
+              button.addEventListener('click', () => {
+                  orderInstance.deleteOrderLine(parseInt(button.getAttribute("data-delete")));
+              })
+          });
+      }
+  
+      static invoiceNumber(orderInstance) {
+          orderInstance.generateInvoiceNumber().then(invoiceNumber => {
+              orderInstance.invoiceNumber = invoiceNumber;
+              const invoiceNumberEl = document.getElementById('invoice-number');
+              if (invoiceNumberEl) invoiceNumberEl.textContent = `Invoice# ${invoiceNumber}`;
+          }).catch(error => {
+              console.error('Error al generar número de factura:', error);
+              const invoiceNumberEl = document.getElementById('invoice-number');
+              if (invoiceNumberEl) invoiceNumberEl.textContent = 'Error al generar número de factura';
+          });
+      }
+      static summary(orderInstance) {
+          const summary = orderInstance.getSummary();
+          const subtotal = document.getElementById("subtotal-summary");
+          const tiempo = document.getElementById("tiempo-summary");
+          const tax = document.getElementById("tax-summary");
+          const grandtotal = document.getElementById("grandtotal-summary");
+          if (tiempo) tiempo.textContent = (summary.tiempo);
+          if (subtotal) subtotal.textContent = Utilities.convertFloatToString(summary.subtotal);
+          if (tax) tax.textContent = Utilities.convertFloatToString(summary.tax);
+          if (grandtotal) grandtotal.textContent = Utilities.convertFloatToString(summary.grandtotal);
+      }
+  
+      static showPaypad(orderInstance) {
+          const paypad = document.getElementById('payment-overlay');
+          paypad.style.display = "grid"
+      }
+  
+      static hidePaypad(orderInstance) {
+          const paypad = document.getElementById('payment-overlay');
+          paypad.style.display = "none"
+      }
+  
+  
+      static paymentSummary(orderInstance) {
+          const amountPaid = document.getElementById('amount-paid');
+          if (amountPaid) amountPaid.textContent = Utilities.convertFloatToString(orderInstance.payment.amountPaid);
+
+          const changeTipTitle = document.getElementById('tip-change-title');
+          const paymentType = document.getElementById('payment-type');
+          if (changeTipTitle && paymentType) {
+            if (orderInstance.payment.type === 'credit') {
+                changeTipTitle.textContent = "Tip:";
+                paymentType.textContent = "CC";
+            } else if (orderInstance.payment.type === 'cash') {
+                changeTipTitle.textContent = "Change:";
+                paymentType.textContent = "Cash";
+            } else {
+                changeTipTitle.textContent = "Change:";
+                paymentType.textContent = "";
+            }
+          }
+          const tipChangeValue = document.getElementById("tip-change-value");
+          if (tipChangeValue) tipChangeValue.textContent = Utilities.convertFloatToString(orderInstance.payment.changeTip);
+      }
+  
+  
+      static closeButton(bool) {
+          const closeButton = document.getElementById('close-sale');
+          if (closeButton) {
+              closeButton.style.display = "grid";
+          }
+      }
+  }
+  
+  class Utilities {
+  
+      static convertFloatToString(float) {
+          let priceParams = {
+              style: "currency",
+              currency: "usd"
+          };
+  
+          return float.toLocaleString("en-en", priceParams);
+      }
+  
+      static roundToTwo(num) {
+          return +(Math.round(num + "e+2") + "e-2");
+      }
+  
+      static paypad(input, orderInstance) {
+          if (!isNaN(parseInt(input))) {
+              this.numberPaypad(parseInt(input), orderInstance);
+          } else if (input === "back") {
+              this.backPaypad(orderInstance);
+          } else if (input === "clear") {
+              this.clearPaypad(orderInstance);
+          } else {
+              orderInstance.closeSale();
+          }
+      }
+  
+      static numberPaypad(input, orderInstance) {
+          const currentInput = this.roundToTwo(input * .01);
+          const currentAmountPaid = this.roundToTwo(orderInstance.payment.amountPaid);
+          const newAmountPaid = this.roundToTwo((currentAmountPaid * 10) + currentInput);
+  
+          if (currentAmountPaid === 0) {
+              orderInstance.changePayment({ amountPaid: currentInput });
+          } else {
+              orderInstance.changePayment({ amountPaid: newAmountPaid });
+          }
+      }
+  
+      static backPaypad(orderInstance) {
+          const currentPayment = orderInstance.payment.amountPaid;
+  
+          if (currentPayment > 0) {
+              const toSubtract = ((currentPayment * 100) % 10) * 0.01;
+              const newAmount = (currentPayment - toSubtract) * 0.1;
+              orderInstance.changePayment({ amountPaid: newAmount });
+          }
+      }
+  
+      static clearPaypad(orderInstance) {
+          orderInstance.changePayment({ amountPaid: 0 });
+      }
+  }
+  
+  
+  
+  
+  
+  
+  //-----------------------------------------------ORDER INSTANTIATION
+  const order = new Order();
+  
+  function sheetData() {
+    google.script.run.withSuccessHandler(function(dataArray){
+  
+      items = Object.values(dataArray.items);
+      sales = dataArray.sales;
+  
+      order.menu = items;
+      order.previousSales = sales;
+  
+      document.querySelectorAll('.product-card').forEach(button => {
+          if (button) button.classList.add('disabled');
+      });
+      const clearOrderBtn = document.getElementById('clear-order');
+      if (clearOrderBtn) clearOrderBtn.classList.add('disabled');
+      document.querySelectorAll('.paypad-show').forEach(button => {
+          if (button) button.classList.add('disabled');
+      });
+  
+      const invoiceNumberEl = document.getElementById('invoice-number');
+      if (invoiceNumberEl) invoiceNumberEl.textContent = 'Generando número de orden...';
+  
+      Ui.menu(order);
+      order.initialize();
+    }).getData();
+  }
+  
+  sheetData();
+  
+  
+  
+  
+  
+  //----------------------------------------------STATIC EVENT LISTENERS
+  
+  // Listener seguro para limpiar orden
+  const clearOrderBtn = document.getElementById('clear-order');
+  if (clearOrderBtn) {
+      clearOrderBtn.addEventListener('click', () => {
+          order.clearOrder();
+      });
+  }
+
+  // Listener seguro para paypad-show
+  const paypadShowBtns = document.querySelectorAll('.paypad-show');
+  if (paypadShowBtns && paypadShowBtns.length > 0) {
+      paypadShowBtns.forEach(button => {
+          button.addEventListener('click', () => {
+              Ui.showPaypad(order);
+              order.changePayment(JSON.parse(button.getAttribute("data-payment-type")));
+          });
+      });
+  }
+
+  // Listener seguro para paypad-close
+  const paypadCloseBtn = document.getElementById('paypad-close');
+  if (paypadCloseBtn) {
+      paypadCloseBtn.addEventListener('click', () => {
+          order.clearPayment();
+          Ui.hidePaypad(order);
+      });
+  }
+
+  // Listener seguro para paypad-btn
+  const paypadBtns = document.querySelectorAll('.paypad-btn');
+  if (paypadBtns && paypadBtns.length > 0) {
+      paypadBtns.forEach(button => {
+          button.addEventListener('click', () => {
+              Utilities.paypad(button.getAttribute("data-id"), order);
+          });
+      });
+  }
+  
+  
+  
+  const mockMenuData = [
+      [101, 'Hamburger', 10.99, 0.05, 'https://i.ibb.co/Vq2Ny7x/burger-min.jpg'],
+      [102, 'Fries', 6.99, 0.05, 'https://i.ibb.co/LZj9Z6C/fries-min.jpg'],
+      [103, 'Salad', 9.5, 0.05, 'https://i.ibb.co/yyPbfKy/salad-min.jpg'],
+      [104, 'Pizza', 24.75, 0.05, 'https://i.ibb.co/B2xPpKg/pizza-min.jpg'],
+      [105, 'Cake', 7.0, 0.05, 'https://i.ibb.co/pfXKGPN/cake-min.jpg'],
+      [106, 'Donuts', 5.45, 0.05, 'https://i.ibb.co/8N0N8qs/donuts-min.jpg'],
+      [107, 'Crepes', 12.5, 0.05, 'https://i.ibb.co/Fb8CQnj/crepes-min.jpg'],
+      [108, 'Cupcake', 3.55, 0.05, 'https://i.ibb.co/s38mNCT/cupcake-min.jpg'],
+      [109, 'Sandwich', 8.99, 0.05, 'https://i.ibb.co/GHK7JZT/sandwich-min.jpg'],
+      [110, 'Steak', 26.98, 0.05, 'https://i.ibb.co/Dr7qFyk/steak-min.jpg'],
+      [111, 'Veggie Thali', 13.45, 0.05, 'https://i.ibb.co/QjpPR3M/thali-min.jpg'],
+      [112, 'Sushi', 18.26, 0.05, 'https://i.ibb.co/FnBRhmF/sushi-min.jpg'],
+      [113, 'Chicken Tenders', 6.79, 0.05, 'https://i.ibb.co/z5XX7wq/chickentenders-min.jpg'],
+      [114, 'Sorbet', 5.75, 0.05, 'https://i.ibb.co/z4vdbw4/sorbet-min.jpg'],
+      [115, 'Dumplings', 11.45, 0.05, 'https://i.ibb.co/kckDb4D/dumplings-min.jpg']
+  ];
+  
+  const mockPreviousSalesData = [
+      ["", 4999, 101.0, 1.0, 10.99, 0.5495],
+      ["", 4999, 102.0, 2.0, 7.95, 0.3975],
+      ["", 4999, 103.0, 3.0, 8.96, 0.45],
+      ["", 5000, 106.0, 1.0, 6.99, 0.35],
+      ["", 5000, 107.0, 1.0, 5.95, 0.30]
+  ];
+  
+  const mockPaymentsData = [
+      ["", 4999, 56.46, "cc", 5.00],
+      ["", 5000, 13.59, "cash", 0]
+  ]
+  
+  //-----------------------------------------------NAVEGACIÓN Y GESTIÓN DE VISTAS
+  
+  // Referencias a elementos de navegación
+  const mainView = document.getElementById('main-view');
+  const ordenesView = document.getElementById('ordenes-view');
+  const verOrdenesBtn = document.getElementById('ver-ordenes');
+  const volverPosBtn = document.getElementById('volver-pos');
+  const adminPanelBtn = document.getElementById('admin-panel');
+  const ordenDetalle = document.getElementById('orden-detalle');
+  
+  // Evento para mostrar la vista de órdenes
+  if (verOrdenesBtn && mainView && ordenesView) {
+    verOrdenesBtn.addEventListener('click', () => {
+      mainView.style.display = 'none';
+      ordenesView.style.display = 'flex';
+      if (typeof cargarUltimasOrdenes === 'function') cargarUltimasOrdenes();
+    });
+  }
+  
+  // Evento para volver al POS
+  if (volverPosBtn && mainView && ordenesView && ordenDetalle) {
+    volverPosBtn.addEventListener('click', () => {
+      ordenesView.style.display = 'none';
+      ordenDetalle.style.display = 'none';
+      mainView.style.display = 'flex';
+    });
+  }
+  
+  // Evento para ir al panel de administración
+  if (adminPanelBtn) {
+    adminPanelBtn.addEventListener('click', () => {
+      window.location.href = window.location.href + '?mode=reports';
+    });
+  }
+  
+  // Función para cargar las últimas órdenes
+  function cargarUltimasOrdenes() {
+    const ordenesTablaBody = document.getElementById('ordenes-tabla-body');
+    ordenesTablaBody.innerHTML = '<tr><td colspan="5" class="loading-text">Cargando órdenes...</td></tr>';
+    
+    google.script.run
+      .withSuccessHandler(mostrarOrdenes)
+      .withFailureHandler(mostrarErrorOrdenes)
+      .getUltimasOrdenes(20);
+  }
+  
+  // Función para mostrar las órdenes en la tabla
+  function mostrarOrdenes(resultado) {
+    const ordenesTablaBody = document.getElementById('ordenes-tabla-body');
+    ordenesTablaBody.innerHTML = '';
+    
+    if (!resultado.success) {
+      ordenesTablaBody.innerHTML = `<tr><td colspan="5" class="loading-text">Error: ${resultado.error}</td></tr>`;
+      return;
+    }
+    
+    if (resultado.ordenes.length === 0) {
+      ordenesTablaBody.innerHTML = '<tr><td colspan="5" class="loading-text">No hay órdenes registradas</td></tr>';
+      return;
+    }
+    
+    resultado.ordenes.forEach(orden => {
+      const fila = document.createElement('tr');
+      
+      let metodoPago = 'No disponible';
+      if (orden.pago && orden.pago.metodoPago) {
+        metodoPago = orden.pago.metodoPago;
+      }
+      
+      fila.innerHTML = `
+        <td>#${orden.numero}</td>
+        <td>${orden.fechaFormateada || 'Fecha no disponible'}</td>
+        <td>${Utilities.convertFloatToString(orden.granTotal || 0)}</td>
+        <td>${metodoPago}</td>
+        <td>
+          <button class="btn-accion" data-orden="${orden.numero}">
+            <i class="fas fa-eye"></i> Ver
+          </button>
+          <button class="btn-accion btn-reimprimir" data-reimprimir="${orden.numero}">
+            <i class="fas fa-print"></i> Reimprimir
+          </button>
+        </td>
+      `;
+      
+      ordenesTablaBody.appendChild(fila);
+    });
+    
+    // Añadir eventos a los botones de acción
+    document.querySelectorAll('.btn-accion[data-orden]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const ordenNum = btn.getAttribute('data-orden');
+        verDetalleOrden(ordenNum);
+      });
+    });
+    
+    document.querySelectorAll('.btn-accion[data-reimprimir]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const ordenNum = btn.getAttribute('data-reimprimir');
+        reimprimirFactura(ordenNum);
+      });
+    });
+  }
+  
+  // Función para mostrar error al cargar órdenes
+  function mostrarErrorOrdenes(error) {
+    const ordenesTablaBody = document.getElementById('ordenes-tabla-body');
+    ordenesTablaBody.innerHTML = `<tr><td colspan="5" class="loading-text">Error: ${error}</td></tr>`;
+  }
+  
+  // Función para ver el detalle de una orden
+  function verDetalleOrden(ordenNum) {
+    const ordenDetalle = document.getElementById('orden-detalle');
+    if (!ordenDetalle) return;
+    ordenDetalle.innerHTML = '<p class="loading-text">Cargando detalles...</p>';
+    ordenDetalle.style.display = 'block';
+    
+    google.script.run
+      .withSuccessHandler(mostrarDetalleOrden)
+      .withFailureHandler(mostrarErrorDetalle)
+      .getDetalleOrden(ordenNum);
+  }
+  
+  // Función para mostrar el detalle de una orden
+  function mostrarDetalleOrden(resultado) {
+    const ordenDetalle = document.getElementById('orden-detalle');
+    if (!ordenDetalle) return;
+    
+    if (!resultado.success) {
+      ordenDetalle.innerHTML = `<p class="loading-text">Error: ${resultado.error}</p>`;
+      return;
+    }
+    
+    const orden = resultado.orden;
+    let itemsHTML = '';
+    
+    orden.items.forEach(item => {
+      itemsHTML += `
+        <tr>
+          <td>${item.descripcion}</td>
+          <td>${item.cantidad}</td>
+          <td>${Utilities.convertFloatToString(item.precio)}</td>
+          <td>${Utilities.convertFloatToString(item.subtotal)}</td>
+        </tr>
+      `;
+    });
+    
+    let metodoPago = 'No disponible';
+    let cambio = 0;
+    
+    if (orden.pago) {
+      metodoPago = orden.pago.metodoPago;
+      cambio = orden.pago.cambio;
+    }
+    
+    ordenDetalle.innerHTML = `
+      <div class="orden-encabezado">
+        <h3>Orden #${orden.numero}</h3>
+        <p>${orden.fechaFormateada || 'Fecha no disponible'}</p>
+      </div>
+      
+      <div class="orden-info">
+        <p><strong>Método de pago:</strong> ${metodoPago}</p>
+        <p><strong>Cambio/Propina:</strong> ${Utilities.convertFloatToString(cambio)}</p>
+      </div>
+      
+      <div class="orden-items">
+        <h4>Productos</h4>
+        <table>
+          <thead>
+            <tr>
+              <th>Descripción</th>
+              <th>Cantidad</th>
+              <th>Precio</th>
+              <th>Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHTML}
+          </tbody>
+        </table>
+      </div>
+      
+      <div class="orden-total">
+        <p>Subtotal: ${Utilities.convertFloatToString(orden.totalItems)}</p>
+        <p>Impuestos: ${Utilities.convertFloatToString(orden.totalImpuestos)}</p>
+        <p>Total: ${Utilities.convertFloatToString(orden.granTotal)}</p>
+      </div>
+      
+      <div class="orden-acciones">
+        <button class="btn-orden btn-volver" id="cerrar-detalle">
+          <i class="fas fa-times"></i> Cerrar
+        </button>
+        <button class="btn-orden btn-reimprimir" id="reimprimir-desde-detalle" data-orden="${orden.numero}">
+          <i class="fas fa-print"></i> Reimprimir
+        </button>
+      </div>
+    `;
+    
+    // Evento para cerrar el detalle
+    const cerrarDetalleBtn = document.getElementById('cerrar-detalle');
+    if (cerrarDetalleBtn) {
+      cerrarDetalleBtn.addEventListener('click', () => {
+        ordenDetalle.style.display = 'none';
+      });
+    }
+    
+    // Evento para reimprimir desde el detalle
+    const reimprimirBtn = document.getElementById('reimprimir-desde-detalle');
+    if (reimprimirBtn) {
+      reimprimirBtn.addEventListener('click', () => {
+        const ordenNum = reimprimirBtn.getAttribute('data-orden');
+        if (typeof reimprimirFactura === 'function') reimprimirFactura(ordenNum);
+      });
+    }
+  }
+  
+  // Función para mostrar error al cargar detalle
+  function mostrarErrorDetalle(error) {
+    const ordenDetalle = document.getElementById('orden-detalle');
+    if (ordenDetalle) ordenDetalle.innerHTML = `<p class="loading-text">Error: ${error}</p>`;
+  }
+  
+  // Función para reimprimir una factura
+  function reimprimirFactura(ordenNum) {
+    alert(`Reimprimiendo factura #${ordenNum}`);
+    
+    google.script.run
+      .withSuccessHandler(function(resultado) {
+        if (resultado.success) {
+          alert(`La factura #${ordenNum} se ha reimpreso correctamente`);
+        } else {
+          alert(`Error al reimprimir la factura: ${resultado.error}`);
+        }
+      })
+      .withFailureHandler(function(error) {
+        alert(`Error: ${error}`);
+      })
+      .reimprimirFactura(ordenNum);
+  }
+
+  function saveOrder() {
+    if (!validateOrder()) {
+        showMessage('Por favor complete todos los campos requeridos', 'error');
+        return;
+    }
+
+    const orderData = prepareOrderData();
+    const paymentData = preparePaymentData();
+
+    const data = {
+        order: orderData,
+        payment: paymentData
+    };
+
+    showLoadingMessage('Guardando orden...');
+    
+    google.script.run
+        .withSuccessHandler(function(result) {
+            if (result.success) {
+                showMessage('Orden guardada exitosamente', 'success');
+                resetForm();
+                updateStats();
+            } else {
+                let errorMsg = 'Error al guardar la orden';
+                if (result.error && result.error.includes('número de factura ya existe')) {
+                    errorMsg = 'El número de factura ya existe. Generando uno nuevo...';
+                    // Intentar nuevamente con un nuevo número de factura
+                    generateInvoiceNumber().then(() => {
+                        saveOrder();
+                    }).catch(error => {
+                        showMessage('Error al generar nuevo número de factura', 'error');
+                    });
+                } else {
+                    showMessage(result.error || errorMsg, 'error');
+                }
+            }
+        })
+        .withFailureHandler(function(error) {
+            console.error('Error al guardar:', error);
+            showMessage('Error al guardar la orden: ' + error, 'error');
+        })
+        .setData(JSON.stringify(data));
+  }
+
+  function showMessage(message, type = 'info') {
+    let messageContainer = document.getElementById('message-container');
+    if (!messageContainer) {
+        messageContainer = document.createElement('div');
+        messageContainer.id = 'message-container';
+        messageContainer.style.position = 'fixed';
+        messageContainer.style.top = '20px';
+        messageContainer.style.right = '20px';
+        messageContainer.style.zIndex = '1000';
+        document.body.appendChild(messageContainer);
+    }
+
+    const messageElement = document.createElement('div');
+    messageElement.className = `message message-${type}`;
+    messageElement.textContent = message;
+    messageElement.style.padding = '10px 20px';
+    messageElement.style.marginBottom = '10px';
+    messageElement.style.borderRadius = '4px';
+    messageElement.style.backgroundColor = type === 'error' ? '#ff4444' : 
+                                         type === 'success' ? '#00C851' : 
+                                         type === 'warning' ? '#ffbb33' : '#33b5e5';
+    messageElement.style.color = '#fff';
+    messageElement.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+
+    messageContainer.appendChild(messageElement);
+
+    setTimeout(() => {
+        messageElement.remove();
+    }, 3000);
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    // Filtro de categorías
+    const categoryBtns = document.querySelectorAll('.category-btn');
+    const searchInput = document.getElementById('search-product');
+
+    categoryBtns.forEach(catBtn => {
+      catBtn.addEventListener('click', function() {
+        categoryBtns.forEach(btn => btn.classList.remove('active'));
+        this.classList.add('active');
+        filtrarMenu();
+      });
+    });
+    searchInput.addEventListener('input', filtrarMenu);
+
+    function filtrarMenu() {
+      const searchTerm = (searchInput.value || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+      const menuItems = document.querySelectorAll('.product-card');
+      const categoryActiveBtn = document.querySelector('.category-btn.active');
+      const categoryActive = categoryActiveBtn ? (categoryActiveBtn.getAttribute('data-category') || 'all') : 'all';
+      menuItems.forEach(item => {
+        let data = {};
+        try {
+          data = JSON.parse(item.getAttribute('data-sku'));
+        } catch (e) {}
+        // Normalizar descripción y categoría para búsqueda robusta
+        const description = (data.description || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+        const itemCategory = (item.getAttribute('data-category') || data.category || 'Otros').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+        const categoryFilter = (categoryActive || 'all').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+        // Coincidencia de categoría (all = todos)
+        const matchesCategory = categoryFilter === 'all' || itemCategory === categoryFilter;
+        // Coincidencia de búsqueda en descripción o categoría
+        const matchesSearch = !searchTerm || description.includes(searchTerm) || itemCategory.includes(searchTerm);
+        if (matchesCategory && matchesSearch) {
+          item.style.display = 'flex';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    }
+
+    // Esperar a que el sistema esté listo (productos y número de orden)
+    function hideInitialLoaderWhenReady() {
+      // Espera a que el menú esté renderizado y el invoice number generado
+      const checkReady = () => {
+        const menuReady = document.querySelectorAll('.product-card').length > 0;
+        const invoiceReady = document.getElementById('invoice-number') && document.getElementById('invoice-number').textContent.includes('Invoice#');
+        if (menuReady && invoiceReady) {
+          const loader = document.getElementById('initial-loader');
+          if (loader) loader.style.display = 'none';
+        } else {
+          setTimeout(checkReady, 100); // Reintenta hasta que esté listo
+        }
+      };
+      checkReady();
+    }
+    hideInitialLoaderWhenReady();
+
+    // Lógica robusta para todos los métodos de pago
+    const paymentBtns = document.querySelectorAll('.payment-btn');
+    paymentBtns.forEach(btn => {
+      btn.addEventListener('click', function() {
+        // Quitar clase activa de todos
+        paymentBtns.forEach(b => b.classList.remove('active'));
+        // Activar el botón clickeado
+        this.classList.add('active');
+        // Obtener el método de pago desde el id o data-attribute
+        let method = this.id.replace('pay-', '');
+        // Si hay un data-method, úsalo
+        if (this.dataset.method) method = this.dataset.method;
+        // Actualizar el método de pago en la orden
+        if (typeof order !== 'undefined') {
+          order.changePayment({ type: method });
+        }
+      });
+    });
+  });
+</script>

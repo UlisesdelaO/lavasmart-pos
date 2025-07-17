@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Calendario</title>
+  <base target="_top">
+  <?!= include('styles-css'); ?>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    
+    .calendar-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .calendar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    
+    .calendar-title {
+      font-size: 24px;
+      font-weight: bold;
+    }
+    
+    .calendar-nav {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .calendar-nav button {
+      padding: 8px 16px;
+      border: none;
+      background: #4285f4;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    .calendar-nav button:hover {
+      background: #3367d6;
+    }
+    
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 1px;
+      background: #e0e0e0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    
+    .calendar-day-header {
+      background: #f8f9fa;
+      padding: 15px 10px;
+      text-align: center;
+      font-weight: bold;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .calendar-day {
+      background: white;
+      padding: 10px;
+      min-height: 120px;
+      position: relative;
+      border: 1px solid #f0f0f0;
+    }
+    
+    .calendar-day.today {
+      background: #e8f0fe;
+    }
+    
+    .calendar-day.other-month {
+      background: #f9f9f9;
+      color: #999;
+    }
+    
+    .day-number {
+      font-weight: bold;
+      margin-bottom: 8px;
+      color: #333;
+    }
+    
+    .event {
+      padding: 4px 8px;
+      margin: 2px 0;
+      font-size: 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: transform 0.2s;
+      color: white;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    
+    .event:hover {
+      transform: translateX(3px);
+    }
+
+    /* Colores para cada calendario */
+    .event.acero {
+      background: #78909C;
+    }
+    .event.azul {
+      background: #2196F3;
+    }
+    .event.blanco {
+      background: #90A4AE;
+      color: #333;
+    }
+    .event.plata {
+      background: #9E9E9E;
+    }
+    .event.zafiro {
+      background: #1976D2;
+    }
+    .event.cobalto {
+      background: #0D47A1;
+    }
+    
+    .event-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+    }
+    
+    .event-modal-content {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+      max-width: 500px;
+      width: 90%;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    
+    .close-modal {
+      position: absolute;
+      right: 15px;
+      top: 15px;
+      cursor: pointer;
+      font-size: 24px;
+      color: #666;
+      transition: color 0.3s;
+    }
+
+    .close-modal:hover {
+      color: #333;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      font-size: 16px;
+      color: #666;
+    }
+
+    .error {
+      color: #d32f2f;
+      background: #ffebee;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 15px 0;
+      display: none;
+      border: 1px solid #ffcdd2;
+    }
+
+    .calendar-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 8px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+    }
+
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+    }
+
+    #event-details {
+      margin-top: 15px;
+    }
+
+    #event-details p {
+      margin: 8px 0;
+      line-height: 1.5;
+    }
+
+    .event-title {
+      color: #1a73e8;
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="calendar-container">
+    <div class="calendar-header">
+      <div class="calendar-title" id="calendar-title">Calendario</div>
+      <div class="calendar-nav">
+        <button id="pos-btn">POS</button>
+        <button id="reportes-btn">Reportes</button>
+        <button id="prev-month">Mes Anterior</button>
+        <button id="next-month">Mes Siguiente</button>
+      </div>
+    </div>
+
+    <div class="calendar-legend" id="calendar-legend">
+      <!-- La leyenda se generará dinámicamente -->
+    </div>
+
+    <div id="error-message" class="error"></div>
+    <div id="loading" class="loading">Cargando calendario...</div>
+    <div class="calendar-grid" id="calendar-grid" style="display: none">
+      <!-- Los días del calendario se generarán dinámicamente -->
+    </div>
+  </div>
+  
+  <div class="event-modal" id="event-modal">
+    <div class="event-modal-content">
+      <span class="close-modal" id="close-modal">&times;</span>
+      <h2 id="event-title" class="event-title">Detalles del Evento</h2>
+      <div id="event-details"></div>
+    </div>
+  </div>
+
+  <script>
+    // Variables globales
+    let currentDate = new Date();
+    let events = [];
+    
+    // Nombres de los días de la semana
+    const weekDays = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+    // Configuración de calendarios
+    const CALENDARS = <?!= JSON.stringify(calendars) ?>;
+    
+    // Función para mostrar errores
+    function showError(message) {
+      const errorDiv = document.getElementById('error-message');
+      errorDiv.textContent = message;
+      errorDiv.style.display = 'block';
+    }
+
+    // Función para mostrar/ocultar el indicador de carga
+    function toggleLoading(show) {
+      document.getElementById('loading').style.display = show ? 'block' : 'none';
+      document.getElementById('calendar-grid').style.display = show ? 'none' : 'grid';
+    }
+
+    // Generar leyenda de calendarios
+    function generateLegend() {
+      const legend = document.getElementById('calendar-legend');
+      legend.innerHTML = '';
+      
+      CALENDARS.forEach(calendar => {
+        if (calendar.active) {
+          const item = document.createElement('div');
+          item.className = 'legend-item';
+          
+          const color = document.createElement('div');
+          color.className = `legend-color ${calendar.color}`;
+          color.style.background = getComputedStyle(document.documentElement)
+            .getPropertyValue(`--${calendar.color}-color`) || 
+            document.querySelector(`.event.${calendar.color}`).style.background;
+          
+          const name = document.createElement('span');
+          name.textContent = calendar.name;
+          
+          item.appendChild(color);
+          item.appendChild(name);
+          legend.appendChild(item);
+        }
+      });
+    }
+    
+    // Cargar eventos del servidor
+    function loadEvents() {
+      toggleLoading(true);
+      document.getElementById('error-message').style.display = 'none';
+      
+      const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+      
+      const activeCalendarIds = CALENDARS
+        .filter(cal => cal.active)
+        .map(cal => cal.id);
+      
+      google.script.run
+        .withSuccessHandler(function(loadedEvents) {
+          events = loadedEvents || [];
+          renderCalendar();
+          toggleLoading(false);
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error al cargar eventos:', error);
+          showError('Error al cargar eventos: ' + error.message);
+          toggleLoading(false);
+        })
+        .getCalendarEvents(activeCalendarIds, startDate.toISOString(), endDate.toISOString());
+    }
+    
+    // Renderizar el calendario
+    function renderCalendar() {
+      const calendarGrid = document.getElementById('calendar-grid');
+      calendarGrid.innerHTML = '';
+      
+      // Agregar encabezados de días
+      weekDays.forEach(day => {
+        const dayHeader = document.createElement('div');
+        dayHeader.className = 'calendar-day-header';
+        dayHeader.textContent = day;
+        calendarGrid.appendChild(dayHeader);
+      });
+      
+      // Obtener primer día del mes
+      const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      const startingDay = firstDay.getDay();
+      
+      // Obtener último día del mes
+      const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+      const totalDays = lastDay.getDate();
+      
+      // Agregar días del mes anterior
+      const prevMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0);
+      const prevMonthDays = prevMonth.getDate();
+      
+      for (let i = startingDay - 1; i >= 0; i--) {
+        const day = document.createElement('div');
+        day.className = 'calendar-day other-month';
+        day.innerHTML = `<div class="day-number">${prevMonthDays - i}</div>`;
+        calendarGrid.appendChild(day);
+      }
+      
+      // Agregar días del mes actual
+      const today = new Date();
+      for (let i = 1; i <= totalDays; i++) {
+        const day = document.createElement('div');
+        const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), i);
+        
+        day.className = 'calendar-day';
+        if (date.toDateString() === today.toDateString()) {
+          day.classList.add('today');
+        }
+        
+        day.innerHTML = `<div class="day-number">${i}</div>`;
+        
+        // Agregar eventos del día
+        if (events && Array.isArray(events)) {
+          const dayEvents = events.filter(event => {
+            if (!event || !event.start) return false;
+            const eventDate = new Date(event.start);
+            return eventDate.getDate() === i && 
+                   eventDate.getMonth() === currentDate.getMonth() &&
+                   eventDate.getFullYear() === currentDate.getFullYear();
+          });
+          
+          dayEvents.forEach(event => {
+            const calendar = CALENDARS.find(cal => cal.id === event.calendarId);
+            const eventElement = document.createElement('div');
+            eventElement.className = `event ${calendar ? calendar.color : ''}`;
+            eventElement.textContent = event.title || 'Sin título';
+            eventElement.onclick = () => showEventDetails(event);
+            day.appendChild(eventElement);
+          });
+        }
+        
+        calendarGrid.appendChild(day);
+      }
+      
+      // Actualizar título del calendario
+      document.getElementById('calendar-title').textContent = 
+        currentDate.toLocaleString('es', { month: 'long', year: 'numeric' });
+    }
+    
+    // Mostrar detalles del evento
+    function showEventDetails(event) {
+      const modal = document.getElementById('event-modal');
+      const title = document.getElementById('event-title');
+      const details = document.getElementById('event-details');
+      
+      const calendar = CALENDARS.find(cal => cal.id === event.calendarId);
+      title.textContent = event.title || 'Sin título';
+      title.className = `event-title ${calendar ? calendar.color : ''}`;
+      
+      const startDate = event.start ? new Date(event.start) : null;
+      const endDate = event.end ? new Date(event.end) : null;
+      
+      details.innerHTML = `
+        ${calendar ? `<p><strong>Calendario:</strong> ${calendar.name}</p>` : ''}
+        ${startDate ? `<p><strong>Inicio:</strong> ${startDate.toLocaleString()}</p>` : ''}
+        ${endDate ? `<p><strong>Fin:</strong> ${endDate.toLocaleString()}</p>` : ''}
+        ${event.location ? `<p><strong>Ubicación:</strong> ${event.location}</p>` : ''}
+        ${event.description ? `<p><strong>Descripción:</strong> ${event.description}</p>` : ''}
+      `;
+      
+      modal.style.display = 'block';
+    }
+    
+    // Eventos de navegación
+    document.addEventListener('DOMContentLoaded', () => {
+      generateLegend();
+      loadEvents();
+      document.getElementById('pos-btn').addEventListener('click', function() {
+        window.top.location.href = '<?= ScriptApp.getService().getUrl() ?>';
+      });
+      document.getElementById('reportes-btn').addEventListener('click', function() {
+        window.top.location.href = '<?= ScriptApp.getService().getUrl() ?>?mode=reports';
+      });
+      document.getElementById('prev-month').addEventListener('click', () => {
+        currentDate.setMonth(currentDate.getMonth() - 1);
+        loadEvents();
+      });
+      document.getElementById('next-month').addEventListener('click', () => {
+        currentDate.setMonth(currentDate.getMonth() + 1);
+        loadEvents();
+      });
+    });
+  </script>
+</body>
+</html> 
