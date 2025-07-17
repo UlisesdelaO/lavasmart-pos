@@ -320,7 +320,7 @@
            serviciosOrden.forEach(servicio => {
              orderInstance.menu.filter(item => item.category === servicio).forEach(item => {
                let descripcion = item.description.length > 30 ? item.description.substring(0, 27) + '...' : item.description;
-               let menuElement = `
+              let menuElement = `
                    <div class="product-card" data-category="${item.category || 'Otros'}" data-sku='${JSON.stringify({ 
                        sku: item.sku, 
                        description: item.description, 
@@ -333,7 +333,7 @@
                        <img src="${item.image}" alt="${item.description}" class="product-img">
                        <div class="product-title" title="${item.description}">${descripcion}</div>
                        <div class="product-price">${Utilities.convertFloatToString(item.price)}</div>
-                   </div>`;
+                  </div>`;
                let node = document.createElement("div");
                node.innerHTML = menuElement;
                let card = node.firstElementChild;
@@ -367,7 +367,7 @@
                        <div class="product-price">${Utilities.convertFloatToString(item.price)}</div>
                    </div>`;
                let node = document.createElement("div");
-               node.innerHTML = menuElement;
+              node.innerHTML = menuElement;
                let card = node.firstElementChild;
                let addBtn = document.createElement('button');
                addBtn.className = 'add-to-bill-btn';
@@ -378,7 +378,7 @@
                });
                card.appendChild(addBtn);
                frag.appendChild(card);
-             });
+          });
            });
            // Finalmente, cualquier otro producto no categorizado
            orderInstance.menu.filter(item => !serviciosOrden.includes(item.category) && !promos.includes(item.category)).forEach(item => {
@@ -467,9 +467,9 @@
                       <div class="receipt-item-title">${orderLine.description}</div>
                       <div class="receipt-item-qty">
                           <button class="receipt-qty-btn quantity-minus" data-index="${index}">-</button>
-                          <span class="editable-quantity">${orderLine.quantity}</span>
+                  <span class="editable-quantity">${orderLine.quantity}</span>
                           <button class="receipt-qty-btn quantity-plus" data-index="${index}">+</button>
-                      </div>
+                  </div>
                       <div class="receipt-item-price">${Utilities.convertFloatToString(orderLine.price)}</div>
                       <div class="receipt-item-price">${Utilities.convertFloatToString(orderLine.subtotal)}</div>
                       <button class="receipt-qty-btn delete" data-delete="${index}" title="Eliminar"><i class="fas fa-times"></i></button>
@@ -542,20 +542,20 @@
       static paymentSummary(orderInstance) {
           const amountPaid = document.getElementById('amount-paid');
           if (amountPaid) amountPaid.textContent = Utilities.convertFloatToString(orderInstance.payment.amountPaid);
-
+  
           const changeTipTitle = document.getElementById('tip-change-title');
           const paymentType = document.getElementById('payment-type');
           if (changeTipTitle && paymentType) {
-            if (orderInstance.payment.type === 'credit') {
-                changeTipTitle.textContent = "Tip:";
-                paymentType.textContent = "CC";
-            } else if (orderInstance.payment.type === 'cash') {
-                changeTipTitle.textContent = "Change:";
-                paymentType.textContent = "Cash";
-            } else {
-                changeTipTitle.textContent = "Change:";
-                paymentType.textContent = "";
-            }
+          if (orderInstance.payment.type === 'credit') {
+              changeTipTitle.textContent = "Tip:";
+              paymentType.textContent = "CC";
+          } else if (orderInstance.payment.type === 'cash') {
+              changeTipTitle.textContent = "Change:";
+              paymentType.textContent = "Cash";
+          } else {
+              changeTipTitle.textContent = "Change:";
+              paymentType.textContent = "";
+          }
           }
           const tipChangeValue = document.getElementById("tip-change-value");
           if (tipChangeValue) tipChangeValue.textContent = Utilities.convertFloatToString(orderInstance.payment.changeTip);
@@ -670,36 +670,36 @@
   const clearOrderBtn = document.getElementById('clear-order');
   if (clearOrderBtn) {
       clearOrderBtn.addEventListener('click', () => {
-          order.clearOrder();
+      order.clearOrder();
       });
   }
-
+  
   // Listener seguro para paypad-show
   const paypadShowBtns = document.querySelectorAll('.paypad-show');
   if (paypadShowBtns && paypadShowBtns.length > 0) {
       paypadShowBtns.forEach(button => {
-          button.addEventListener('click', () => {
-              Ui.showPaypad(order);
-              order.changePayment(JSON.parse(button.getAttribute("data-payment-type")));
+      button.addEventListener('click', () => {
+          Ui.showPaypad(order);
+          order.changePayment(JSON.parse(button.getAttribute("data-payment-type")));
           });
       });
   }
-
+  
   // Listener seguro para paypad-close
   const paypadCloseBtn = document.getElementById('paypad-close');
   if (paypadCloseBtn) {
       paypadCloseBtn.addEventListener('click', () => {
-          order.clearPayment();
-          Ui.hidePaypad(order);
+      order.clearPayment();
+      Ui.hidePaypad(order);
       });
   }
-
+  
   // Listener seguro para paypad-btn
   const paypadBtns = document.querySelectorAll('.paypad-btn');
   if (paypadBtns && paypadBtns.length > 0) {
       paypadBtns.forEach(button => {
-          button.addEventListener('click', () => {
-              Utilities.paypad(button.getAttribute("data-id"), order);
+      button.addEventListener('click', () => {
+          Utilities.paypad(button.getAttribute("data-id"), order);
           });
       });
   }
@@ -749,27 +749,27 @@
   
   // Evento para mostrar la vista de órdenes
   if (verOrdenesBtn && mainView && ordenesView) {
-    verOrdenesBtn.addEventListener('click', () => {
-      mainView.style.display = 'none';
-      ordenesView.style.display = 'flex';
+  verOrdenesBtn.addEventListener('click', () => {
+    mainView.style.display = 'none';
+    ordenesView.style.display = 'flex';
       if (typeof cargarUltimasOrdenes === 'function') cargarUltimasOrdenes();
-    });
+  });
   }
   
   // Evento para volver al POS
   if (volverPosBtn && mainView && ordenesView && ordenDetalle) {
-    volverPosBtn.addEventListener('click', () => {
-      ordenesView.style.display = 'none';
-      ordenDetalle.style.display = 'none';
-      mainView.style.display = 'flex';
-    });
+  volverPosBtn.addEventListener('click', () => {
+    ordenesView.style.display = 'none';
+    ordenDetalle.style.display = 'none';
+    mainView.style.display = 'flex';
+  });
   }
   
   // Evento para ir al panel de administración
   if (adminPanelBtn) {
-    adminPanelBtn.addEventListener('click', () => {
-      window.location.href = window.location.href + '?mode=reports';
-    });
+  adminPanelBtn.addEventListener('click', () => {
+    window.location.href = window.location.href + '?mode=reports';
+  });
   }
   
   // Función para cargar las últimas órdenes
@@ -939,8 +939,8 @@
     const cerrarDetalleBtn = document.getElementById('cerrar-detalle');
     if (cerrarDetalleBtn) {
       cerrarDetalleBtn.addEventListener('click', () => {
-        ordenDetalle.style.display = 'none';
-      });
+      ordenDetalle.style.display = 'none';
+    });
     }
     
     // Evento para reimprimir desde el detalle
@@ -949,7 +949,7 @@
       reimprimirBtn.addEventListener('click', () => {
         const ordenNum = reimprimirBtn.getAttribute('data-orden');
         if (typeof reimprimirFactura === 'function') reimprimirFactura(ordenNum);
-      });
+    });
     }
   }
   
