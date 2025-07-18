@@ -22,18 +22,29 @@
       set menu(menuArray) {
           this._menu = [];
           console.log('[DEBUG] menuArray recibido:', menuArray);
-          menuArray.forEach(menuItem => {
+          menuArray.forEach((menuItem, index) => {
               // Soporta arrays de longitud variable y fallback seguro
               let currItem = {};
               currItem.sku = menuItem[0] || '';
               currItem.description = menuItem[1] || '';
               currItem.price = menuItem[2] || 0;
-              currItem.taxRate = menuItem[3] || 0;
+              currItem.taxRate = 0.16; // IVA hardcodeado al 16%
               currItem.image = menuItem[4] || '';
               currItem.tiempo = menuItem[5] || 0;
               // Nombre de archivo y precio ideal pueden omitirse
               currItem.category = menuItem[8] || menuItem[6] || 'Otros';
               this._menu.push(currItem);
+              
+              // DEBUG: Verificar los primeros 3 productos para asegurar que taxRate se carga correctamente
+              if (index < 3) {
+                  console.log(`[DEBUG] Producto ${index + 1}:`, {
+                      sku: currItem.sku,
+                      description: currItem.description,
+                      price: currItem.price,
+                      taxRate: currItem.taxRate,
+                      category: currItem.category
+                  });
+              }
           });
           console.log('[DEBUG] this._menu procesado:', this._menu);
       }
@@ -94,33 +105,34 @@
   
       async generateInvoiceNumber() {
           try {
-              const result = await new Promise((resolve, reject) => {
+              const invoiceNumber = await new Promise((resolve, reject) => {
                   google.script.run
                       .withSuccessHandler(resolve)
                       .withFailureHandler(reject)
-                      .getUltimasOrdenes();
+                      .generateInvoiceNumber();
               });
-              let invoiceNumber;
-              if (!result || !result.length) {
-                  const timestamp = new Date().getTime();
-                  const baseNumber = 1;
-                  invoiceNumber = `${baseNumber}-${timestamp}`;
-              } else {
-                  const timestamp = new Date().getTime();
-                  const highestNumber = Math.max(...result.map(row => {
-                      const num = row[1].split('-')[0];
-                      return parseInt(num, 10);
-                  }));
-                  invoiceNumber = `${highestNumber + 1}-${timestamp}`;
-              }
+              
+              this._invoiceNumber = invoiceNumber.toString();
+              console.log('[DEBUG] Número de factura generado:', this._invoiceNumber);
+              
+              // Actualizar el elemento UI
               const invoiceNumberEl = document.getElementById('invoice-number');
-              if (invoiceNumberEl) invoiceNumberEl.textContent = `Invoice# ${invoiceNumber}`;
+              if (invoiceNumberEl) {
+                  invoiceNumberEl.textContent = `# ${this._invoiceNumber}`;
+              }
+              
               return invoiceNumber;
           } catch (error) {
               console.error('Error al generar número de factura:', error);
+              // Fallback: usar timestamp
+              const timestamp = Date.now();
+              const fallbackNumber = Math.floor(timestamp / 1000);
+              this._invoiceNumber = fallbackNumber.toString();
+              
               const invoiceNumberEl = document.getElementById('invoice-number');
-              if (invoiceNumberEl) invoiceNumberEl.textContent = 'Error al generar número de factura';
-              throw error;
+              if (invoiceNumberEl) invoiceNumberEl.textContent = `# ${this._invoiceNumber}`;
+              
+              return this._invoiceNumber;
           }
       }
   
@@ -145,12 +157,43 @@
               currentLine.description = lineData.description;
               currentLine.tiempo = Utilities.roundToTwo(lineData.tiempo);
               currentLine.quantity = quantity;
-              currentLine.price = Utilities.roundToTwo(parseFloat(lineData.price));
-              currentLine.subtotal = currentLine.quantity * currentLine.price;
-              currentLine.tax = Utilities.roundToTwo(lineData.taxRate * currentLine.subtotal);
+              currentLine.price = Utilities.roundToTwo(parseFloat(lineData.price)); // Precio unitario ya incluye IVA
+              currentLine.taxRate = 0.16; // IVA hardcodeado al 16%
+              
+              // DEBUG: Verificar valores de entrada
+              console.log('[DEBUG] Valores de entrada:', {
+                  sku: currentLine.sku,
+                  price: currentLine.price,
+                  taxRate: currentLine.taxRate,
+                  quantity: currentLine.quantity
+              });
+              
+              // Paso 1: Calcular total con IVA (precio unitario * cantidad)
+              const totalWithTax = Utilities.roundToTwo(currentLine.quantity * currentLine.price);
+              
+              // Paso 2: Desglosar el subtotal sin IVA usando la fórmula: total / (1 + tasa_IVA)
+              currentLine.subtotal = Utilities.roundToTwo(totalWithTax / (1 + currentLine.taxRate));
+              
+              // Paso 3: Calcular el monto del IVA (total con IVA - subtotal sin IVA)
+              currentLine.tax = Utilities.roundToTwo(totalWithTax - currentLine.subtotal);
+              
+              // DEBUG: Verificar cálculos
+              console.log('[DEBUG] Cálculos de IVA:', {
+                  totalWithTax: totalWithTax,
+                  subtotal: currentLine.subtotal,
+                  tax: currentLine.tax,
+                  taxRate: currentLine.taxRate
+              });
+              
+              // Paso 4: Agregar campo para mostrar el total con IVA en el recibo
+              currentLine.totalWithTax = totalWithTax;
           
               this.order.push(currentLine);
-              Ui.receiptDetails(this);
+              
+              // Solo actualizar el recibo si la instancia está completamente inicializada
+              if (this && typeof this.getSummary === 'function') {
+                  Ui.receiptDetails(this);
+              }
           }
       }
       
@@ -162,39 +205,106 @@
           newQuantity = Math.max(1, newQuantity);
           
           this.order[index].quantity = newQuantity;
-          this.order[index].subtotal = newQuantity * this.order[index].price;
-          this.order[index].tax = Utilities.roundToTwo(this.order[index].subtotal * (this.order[index].tax / (this.order[index].subtotal / this.order[index].price)));
           
-          Ui.receiptDetails(this);
+          // Paso 1: Calcular total con IVA (precio unitario ya incluye IVA * nueva cantidad)
+          const totalWithTax = Utilities.roundToTwo(newQuantity * this.order[index].price);
+          const taxRate = 0.16; // IVA hardcodeado al 16%
+          
+          // Paso 2: Desglosar el subtotal sin IVA usando la fórmula: total / (1 + tasa_IVA)
+          this.order[index].subtotal = Utilities.roundToTwo(totalWithTax / (1 + taxRate));
+          
+          // Paso 3: Calcular el monto del IVA (total con IVA - subtotal sin IVA)
+          this.order[index].tax = Utilities.roundToTwo(totalWithTax - this.order[index].subtotal);
+          
+          // Paso 4: Actualizar el total con IVA para mostrar en el recibo
+          this.order[index].totalWithTax = totalWithTax;
+          
+          // Solo actualizar el recibo si la instancia está completamente inicializada
+          if (this && typeof this.getSummary === 'function') {
+              Ui.receiptDetails(this);
+          }
       }
   
       deleteOrderLine(index) {
           this.order.splice(index, 1);
-          Ui.receiptDetails(this)
+          
+          // Solo actualizar el recibo si la instancia está completamente inicializada
+          if (this && typeof this.getSummary === 'function') {
+              Ui.receiptDetails(this);
+          }
       }
   
       clearOrder() {
           this.order = [];
-  
-          Ui.receiptDetails(this);
-      }
-      getSummary() {
-          const summary = {
-              subtotal: 0,
-              tiempo: 0,
-              tax: 0,
-              grandtotal: 0
+          
+          // Limpiar descuentos también
+          if (window.currentDiscount) {
+              window.currentDiscount = { type: null, value: 0, amount: 0 };
           }
   
-          this.order.forEach(orderLine => {
-              summary.subtotal += orderLine.subtotal;
-              summary.tax += orderLine.tax;
-              summary.tiempo += orderLine.tiempo;
-          })
+          // Solo actualizar el recibo si la instancia está completamente inicializada
+          if (this && typeof this.getSummary === 'function') {
+              Ui.receiptDetails(this);
+          }
+      }
+      getSummary() {
+          try {
+              // Verificar que order existe y es un array
+              if (!this.order || !Array.isArray(this.order)) {
+                  return {
+                      subtotal: 0,
+                      tiempo: 0,
+                      tax: 0,
+                      discount: 0,
+                      grandtotal: 0
+                  };
+              }
+              
+              const summary = {
+                  subtotal: 0,
+                  tiempo: 0,
+                  tax: 0,
+                  discount: 0,
+                  grandtotal: 0
+              }
   
-          summary.grandtotal = summary.subtotal + summary.tax;
+              // Paso 1: Sumar todos los subtotales sin IVA, impuestos y tiempos de cada línea
+              this.order.forEach(orderLine => {
+                  if (orderLine && typeof orderLine === 'object') {
+                      summary.subtotal += (orderLine.subtotal || 0); // Suma de precios sin IVA
+                      summary.tax += (orderLine.tax || 0); // Suma de montos de IVA
+                      summary.tiempo += ((orderLine.tiempo || 0) * (orderLine.quantity || 1)); // Suma de tiempos estimados multiplicados por cantidad
+                  }
+              })
+
+              // Paso 2: Calcular total con IVA (subtotal sin IVA + IVA = precio final)
+              const totalWithTax = Utilities.roundToTwo(summary.subtotal + summary.tax);
+              
+              // Paso 3: Aplicar descuento sobre el total final (ya incluye IVA)
+              if (window.currentDiscount && window.currentDiscount.type && window.currentDiscount.value > 0) {
+                  if (window.currentDiscount.type === 'percentage') {
+                      // Descuento porcentual: total * (porcentaje / 100)
+                      summary.discount = Utilities.roundToTwo(totalWithTax * (window.currentDiscount.value / 100));
+                  } else if (window.currentDiscount.type === 'fixed') {
+                      // Descuento fijo: monto específico (sin exceder el total)
+                      summary.discount = Math.min(window.currentDiscount.value, totalWithTax);
+                  }
+              }
+
+              // Paso 4: Calcular gran total después de aplicar el descuento
+              summary.grandtotal = Utilities.roundToTwo(totalWithTax - summary.discount);
   
-          return summary;
+              return summary;
+          } catch (error) {
+              console.error('Error en getSummary:', error);
+              return {
+                  subtotal: 0,
+                  tiempo: 0,
+                  tax: 0,
+                  discount: 0,
+                  grandtotal: 0
+              };
+          }
       }
   
       changePayment(input) {
@@ -320,7 +430,7 @@
            serviciosOrden.forEach(servicio => {
              orderInstance.menu.filter(item => item.category === servicio).forEach(item => {
                let descripcion = item.description.length > 30 ? item.description.substring(0, 27) + '...' : item.description;
-              let menuElement = `
+               let menuElement = `
                    <div class="product-card" data-category="${item.category || 'Otros'}" data-sku='${JSON.stringify({ 
                        sku: item.sku, 
                        description: item.description, 
@@ -332,8 +442,9 @@
                    })}'>
                        <img src="${item.image}" alt="${item.description}" class="product-img">
                        <div class="product-title" title="${item.description}">${descripcion}</div>
+                       <div class="product-time">⏱️ ${item.tiempo || 0} min</div>
                        <div class="product-price">${Utilities.convertFloatToString(item.price)}</div>
-                  </div>`;
+                   </div>`;
                let node = document.createElement("div");
                node.innerHTML = menuElement;
                let card = node.firstElementChild;
@@ -364,10 +475,11 @@
                    })}'>
                        <img src="${item.image}" alt="${item.description}" class="product-img">
                        <div class="product-title" title="${item.description}">${descripcion}</div>
+                       <div class="product-time">⏱️ ${item.tiempo || 0} min</div>
                        <div class="product-price">${Utilities.convertFloatToString(item.price)}</div>
                    </div>`;
                let node = document.createElement("div");
-              node.innerHTML = menuElement;
+               node.innerHTML = menuElement;
                let card = node.firstElementChild;
                let addBtn = document.createElement('button');
                addBtn.className = 'add-to-bill-btn';
@@ -378,7 +490,7 @@
                });
                card.appendChild(addBtn);
                frag.appendChild(card);
-          });
+             });
            });
            // Finalmente, cualquier otro producto no categorizado
            orderInstance.menu.filter(item => !serviciosOrden.includes(item.category) && !promos.includes(item.category)).forEach(item => {
@@ -395,6 +507,7 @@
                  })}'>
                      <img src="${item.image}" alt="${item.description}" class="product-img">
                      <div class="product-title" title="${item.description}">${descripcion}</div>
+                     <div class="product-time">⏱️ ${item.tiempo || 0} min</div>
                      <div class="product-price">${Utilities.convertFloatToString(item.price)}</div>
                  </div>`;
              let node = document.createElement("div");
@@ -425,6 +538,7 @@
                   })}'>
                       <img src="${item.image}" alt="${item.description}" class="product-img">
                       <div class="product-title" title="${item.description}">${descripcion}</div>
+                      <div class="product-time">⏱️ ${item.tiempo || 0} min</div>
                       <div class="product-price">${Utilities.convertFloatToString(item.price)}</div>
                   </div>`;
               let node = document.createElement("div");
@@ -450,38 +564,106 @@
       }
   
       static receiptDetails(orderInstance) {
-          let frag = document.createDocumentFragment();
-          // Encabezado del ticket (ahora solo actualiza los elementos visuales)
-          const invoiceNumber = orderInstance.invoiceNumber || '';
-          const now = new Date();
-          const fechaHora = now.toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' });
-          const invoiceNumberEl = document.getElementById('invoice-number');
-          if (invoiceNumberEl) invoiceNumberEl.textContent = `# ${invoiceNumber}`;
-          const receiptDateEl = document.getElementById('receipt-date');
-          if (receiptDateEl) receiptDateEl.textContent = `Orden: ${fechaHora}`;
+          try {
+              // Verificar que orderInstance existe y tiene los datos necesarios
+              if (!orderInstance || !orderInstance.order || !Array.isArray(orderInstance.order)) {
+                  console.warn('orderInstance no está disponible o no tiene order válido');
+                  return;
+              }
+              
+              let frag = document.createDocumentFragment();
+              // Encabezado del ticket (ahora solo actualiza los elementos visuales)
+              const invoiceNumber = orderInstance.invoiceNumber || '';
+              const now = new Date();
+              const fechaHora = now.toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' });
+              
+              // Solo actualizar el número de factura si no está ya establecido
+              const invoiceNumberEl = document.getElementById('invoice-number');
+              if (invoiceNumberEl && !invoiceNumberEl.textContent.includes('#')) {
+                  invoiceNumberEl.textContent = `# ${invoiceNumber}`;
+              }
+              
+              const receiptDateEl = document.getElementById('receipt-date');
+              if (receiptDateEl) receiptDateEl.textContent = `Orden: ${fechaHora}`;
 
-          // Renderizar productos como filas de tabla
-          orderInstance.order.forEach((orderLine, index) => {
+              // Renderizar productos como cards de detalle
+              orderInstance.order.forEach((orderLine, index) => {
+                  try {
+                      // Verificar que orderLine existe y tiene las propiedades necesarias
+                      if (!orderLine || typeof orderLine !== 'object') {
+                          console.warn('orderLine no válido en índice:', index);
+                          return;
+                      }
+                      
+                                    // Buscar información del producto en el menú para obtener imagen y categoría
+              let menuItem = null;
+              let imageUrl = '';
+              let category = 'Otros';
+              
+              try {
+                  if (orderInstance.menu && Array.isArray(orderInstance.menu)) {
+                      menuItem = orderInstance.menu.find(item => item && item.sku === orderLine.sku);
+                      if (menuItem) {
+                          imageUrl = menuItem.image || '';
+                          category = menuItem.category || 'Otros';
+                      }
+                  }
+              } catch (error) {
+                  console.warn('Error al buscar información del menú para SKU:', orderLine.sku, error);
+              }
+              
+              // Calcular valores para mostrar el desglose (redondeado a 2 decimales)
+              const itemSubtotal = Utilities.roundToTwo(orderLine.subtotal || 0);
+              const itemTax = Utilities.roundToTwo(orderLine.tax || 0);
+              const itemTotal = Utilities.roundToTwo(itemSubtotal + itemTax);
+
               let receiptLine = `
-                  <li class="receipt-item" data-index="${index}">
-                      <div class="receipt-item-title">${orderLine.description}</div>
-                      <div class="receipt-item-qty">
-                          <button class="receipt-qty-btn quantity-minus" data-index="${index}">-</button>
-                  <span class="editable-quantity">${orderLine.quantity}</span>
-                          <button class="receipt-qty-btn quantity-plus" data-index="${index}">+</button>
-                  </div>
-                      <div class="receipt-item-price">${Utilities.convertFloatToString(orderLine.price)}</div>
-                      <div class="receipt-item-price">${Utilities.convertFloatToString(orderLine.subtotal)}</div>
-                      <button class="receipt-qty-btn delete" data-delete="${index}" title="Eliminar"><i class="fas fa-times"></i></button>
-                  </li>`;
-              let node = document.createElement("div");
-              node.innerHTML = receiptLine;
-              frag.appendChild(node.firstElementChild);
-          });
+                  <div class="detail-item-card" data-index="${index}">
+                      <img src="${imageUrl || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIGZpbGw9IiNmN2Y3ZjciIHN0cm9rZT0iI2NjYyIgc3Ryb2tlLXdpZHRoPSIxIi8+PHRleHQgeD0iMzAiIHk9IjM1IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM2Yzc1N2QiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg=='}" 
+                           alt="${orderLine.description}" 
+                           class="detail-item-image"
+                           onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIGZpbGw9IiNmN2Y3ZjciIHN0cm9rZT0iI2NjYyIgc3Ryb2tlLXdpZHRoPSIxIi8+PHRleHQgeD0iMzAiIHk9IjM1IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM2Yzc1N2QiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg=='">
+                      <div class="detail-item-content">
+                          <h4 class="detail-item-name">${orderLine.description}</h4>
+                          <p class="detail-item-category">${category}</p>
+                          <p class="detail-item-time">⏱️ ${(orderLine.tiempo || 0) * (orderLine.quantity || 1)} min</p>
+                          <div class="detail-item-controls">
+                              <div class="detail-item-quantity">
+                                  <button class="detail-item-qty-btn quantity-minus" data-index="${index}">-</button>
+                                  <span class="detail-item-qty-number">${orderLine.quantity}</span>
+                                  <button class="detail-item-qty-btn quantity-plus" data-index="${index}">+</button>
+                              </div>
+                          </div>
+                      </div>
+                      <div class="detail-item-price">
+                          <div class="price-breakdown">
+                              ${orderLine.quantity > 1 ? `<div class="price-calculation">${orderLine.quantity} x ${Utilities.convertFloatToString(orderLine.price)}</div>` : ''}
+                              <div class="price-detail">Sin IVA: ${Utilities.convertFloatToString(itemSubtotal)}</div>
+                              <div class="price-detail">IVA (${Math.round(orderLine.taxRate * 100)}%): ${Utilities.convertFloatToString(itemTax)}</div>
+                              <div class="price-total">Total: ${Utilities.convertFloatToString(itemTotal)}</div>
+                          </div>
+                      </div>
+                      <button class="detail-item-qty-btn delete" data-delete="${index}" title="Eliminar">
+                          <i class="fas fa-trash"></i>
+                      </button>
+                  </div>`;
+                      let node = document.createElement("div");
+                      node.innerHTML = receiptLine;
+                      frag.appendChild(node.firstElementChild);
+                  } catch (error) {
+                      console.error('Error al procesar orderLine en índice:', index, error);
+                  }
+              });
           const receiptDetails = document.getElementById("receipt-details");
           receiptDetails.innerHTML = '';
           receiptDetails.appendChild(frag);
-          this.summary(orderInstance);
+          
+          // Solo llamar a summary si orderInstance está completamente inicializado
+          if (orderInstance && typeof orderInstance.getSummary === 'function' && orderInstance.order && Array.isArray(orderInstance.order)) {
+              this.summary(orderInstance);
+          }
+          
+          // Event listeners para los botones de cantidad
           document.querySelectorAll('.quantity-plus').forEach(button => {
               button.addEventListener('click', function() {
                   const index = parseInt(this.getAttribute('data-index'));
@@ -503,7 +685,18 @@
                   orderInstance.deleteOrderLine(parseInt(button.getAttribute("data-delete")));
               })
           });
+          
+          // Event listener para la búsqueda en el recibo
+          const receiptSearchInput = document.getElementById('receipt-search');
+          if (receiptSearchInput) {
+              receiptSearchInput.addEventListener('input', function() {
+                  this.filterReceiptItems(this.value, orderInstance);
+              }.bind(this));
+          }
+      } catch (error) {
+          console.error('Error en Ui.receiptDetails:', error);
       }
+  }
   
       static invoiceNumber(orderInstance) {
           orderInstance.generateInvoiceNumber().then(invoiceNumber => {
@@ -517,15 +710,74 @@
           });
       }
       static summary(orderInstance) {
-          const summary = orderInstance.getSummary();
-          const subtotal = document.getElementById("subtotal-summary");
-          const tiempo = document.getElementById("tiempo-summary");
-          const tax = document.getElementById("tax-summary");
-          const grandtotal = document.getElementById("grandtotal-summary");
-          if (tiempo) tiempo.textContent = (summary.tiempo);
-          if (subtotal) subtotal.textContent = Utilities.convertFloatToString(summary.subtotal);
-          if (tax) tax.textContent = Utilities.convertFloatToString(summary.tax);
-          if (grandtotal) grandtotal.textContent = Utilities.convertFloatToString(summary.grandtotal);
+          try {
+              // Verificar que orderInstance existe y tiene los métodos necesarios
+              if (!orderInstance || typeof orderInstance.getSummary !== 'function') {
+                  console.warn('orderInstance no está disponible o no tiene getSummary');
+                  return;
+              }
+              
+              // Verificar que order existe y es un array
+              if (!orderInstance.order || !Array.isArray(orderInstance.order)) {
+                  console.warn('orderInstance.order no está disponible o no es un array');
+                  return;
+              }
+              
+              // Obtener summary con manejo de errores
+              let summary;
+              try {
+                  summary = orderInstance.getSummary();
+                  if (!summary || typeof summary !== 'object') {
+                      summary = {
+                          subtotal: 0,
+                          tax: 0,
+                          grandtotal: 0
+                      };
+                  }
+              } catch (error) {
+                  console.error('Error al obtener summary:', error);
+                  summary = {
+                      subtotal: 0,
+                      tax: 0,
+                      grandtotal: 0
+                  };
+              }
+              
+              const itemsCount = document.getElementById("items-count");
+              const itemsCounter = document.getElementById("items-counter");
+              const totalTime = document.getElementById("total-time");
+              const subtotal = document.getElementById("subtotal-summary");
+              const tax = document.getElementById("tax-summary");
+              const grandtotal = document.getElementById("grandtotal-summary");
+              
+              // Verificar que order existe antes de calcular
+              if (!orderInstance.order || !Array.isArray(orderInstance.order)) {
+                  console.warn('orderInstance.order no está disponible');
+                  return;
+              }
+              
+              // Calcular total de items y tiempo total con verificación
+              const totalItems = orderInstance.order.reduce((total, item) => total + (item.quantity || 0), 0);
+              const totalTimeValue = orderInstance.order.reduce((total, item) => total + ((item.tiempo || 0) * (item.quantity || 1)), 0);
+              
+              if (itemsCount) itemsCount.textContent = `${totalItems} (Items)`;
+              if (itemsCounter) itemsCounter.textContent = `${totalItems} items`;
+              if (totalTime) totalTime.textContent = `${totalTimeValue} min`;
+              if (subtotal) subtotal.textContent = Utilities.convertFloatToString(summary.subtotal || 0);
+              if (tax) tax.textContent = Utilities.convertFloatToString(summary.tax || 0);
+              if (grandtotal) grandtotal.textContent = Utilities.convertFloatToString(summary.grandtotal || 0);
+              
+              // Actualizar tiempo total en el header del recibo
+              const receiptDateEl = document.getElementById('receipt-date');
+              if (receiptDateEl) {
+                  const now = new Date();
+                  const fechaHora = now.toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' });
+                  const timeText = totalTimeValue > 0 ? `Orden: ${fechaHora} | ⏱️ ${totalTimeValue} min` : `Orden: ${fechaHora}`;
+                  receiptDateEl.textContent = timeText;
+              }
+          } catch (error) {
+              console.error('Error en Ui.summary:', error);
+          }
       }
   
       static showPaypad(orderInstance) {
@@ -535,27 +787,29 @@
   
       static hidePaypad(orderInstance) {
           const paypad = document.getElementById('payment-overlay');
-          paypad.style.display = "none"
+          if (paypad) {
+              paypad.style.display = "none";
+          }
       }
   
   
       static paymentSummary(orderInstance) {
           const amountPaid = document.getElementById('amount-paid');
           if (amountPaid) amountPaid.textContent = Utilities.convertFloatToString(orderInstance.payment.amountPaid);
-  
+
           const changeTipTitle = document.getElementById('tip-change-title');
           const paymentType = document.getElementById('payment-type');
           if (changeTipTitle && paymentType) {
-          if (orderInstance.payment.type === 'credit') {
-              changeTipTitle.textContent = "Tip:";
-              paymentType.textContent = "CC";
-          } else if (orderInstance.payment.type === 'cash') {
-              changeTipTitle.textContent = "Change:";
-              paymentType.textContent = "Cash";
-          } else {
-              changeTipTitle.textContent = "Change:";
-              paymentType.textContent = "";
-          }
+            if (orderInstance.payment.type === 'credit') {
+                changeTipTitle.textContent = "Tip:";
+                paymentType.textContent = "CC";
+            } else if (orderInstance.payment.type === 'cash') {
+                changeTipTitle.textContent = "Change:";
+                paymentType.textContent = "Cash";
+            } else {
+                changeTipTitle.textContent = "Change:";
+                paymentType.textContent = "";
+            }
           }
           const tipChangeValue = document.getElementById("tip-change-value");
           if (tipChangeValue) tipChangeValue.textContent = Utilities.convertFloatToString(orderInstance.payment.changeTip);
@@ -566,6 +820,44 @@
           const closeButton = document.getElementById('close-sale');
           if (closeButton) {
               closeButton.style.display = "grid";
+          }
+      }
+      
+      static filterReceiptItems(searchTerm, orderInstance) {
+          const receiptItems = document.querySelectorAll('.detail-item-card');
+          const searchLower = searchTerm.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          
+          receiptItems.forEach(item => {
+              const itemName = item.querySelector('.detail-item-name').textContent.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+              const itemCategory = item.querySelector('.detail-item-category').textContent.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+              
+              const matchesSearch = !searchTerm || 
+                  itemName.includes(searchLower) || 
+                  itemCategory.includes(searchLower);
+              
+              if (matchesSearch) {
+                  item.style.display = 'flex';
+                  item.style.opacity = '1';
+              } else {
+                  item.style.display = 'none';
+                  item.style.opacity = '0.3';
+              }
+          });
+          
+          // Mostrar mensaje si no hay resultados
+          const visibleItems = document.querySelectorAll('.detail-item-card[style*="display: flex"]');
+          const noResultsMsg = document.getElementById('no-results-message');
+          
+          if (searchTerm && visibleItems.length === 0) {
+              if (!noResultsMsg) {
+                  const msg = document.createElement('div');
+                  msg.id = 'no-results-message';
+                  msg.className = 'no-results-message';
+                  msg.textContent = `No se encontraron items que coincidan con "${searchTerm}"`;
+                  document.querySelector('.detail-items-list').appendChild(msg);
+              }
+          } else if (noResultsMsg) {
+              noResultsMsg.remove();
           }
       }
   }
@@ -633,29 +925,60 @@
   const order = new Order();
   
   function sheetData() {
-    google.script.run.withSuccessHandler(function(dataArray){
-  
-      items = Object.values(dataArray.items);
-      sales = dataArray.sales;
-  
-      order.menu = items;
-      order.previousSales = sales;
-  
-      document.querySelectorAll('.product-card').forEach(button => {
-          if (button) button.classList.add('disabled');
-      });
-      const clearOrderBtn = document.getElementById('clear-order');
-      if (clearOrderBtn) clearOrderBtn.classList.add('disabled');
-      document.querySelectorAll('.paypad-show').forEach(button => {
-          if (button) button.classList.add('disabled');
-      });
-  
-      const invoiceNumberEl = document.getElementById('invoice-number');
-      if (invoiceNumberEl) invoiceNumberEl.textContent = 'Generando número de orden...';
-  
-      Ui.menu(order);
-      order.initialize();
-    }).getData();
+    google.script.run
+      .withSuccessHandler(function(dataArray) {
+        if (dataArray.error) {
+          showMessage('Error al cargar datos: ' + dataArray.error, 'error');
+          // Intentar configurar la base de datos automáticamente
+          configurarBaseDatosAutomaticamente();
+          return;
+        }
+
+        items = Object.values(dataArray.items);
+        sales = dataArray.sales;
+
+        order.menu = items;
+        order.previousSales = sales;
+
+        // Habilitar controles una vez que los datos estén cargados
+        document.querySelectorAll('.product-card').forEach(button => {
+            if (button) button.classList.remove('disabled');
+        });
+        const clearOrderBtn = document.getElementById('clear-order');
+        if (clearOrderBtn) clearOrderBtn.classList.remove('disabled');
+        document.querySelectorAll('.paypad-show').forEach(button => {
+            if (button) button.classList.remove('disabled');
+        });
+
+        const invoiceNumberEl = document.getElementById('invoice-number');
+        if (invoiceNumberEl) invoiceNumberEl.textContent = 'Generando número de orden...';
+
+        Ui.menu(order);
+        order.initialize();
+      })
+      .withFailureHandler(function(error) {
+        showMessage('Error de conexión: ' + error, 'error');
+        configurarBaseDatosAutomaticamente();
+      })
+      .getData();
+  }
+
+  function configurarBaseDatosAutomaticamente() {
+    showMessage('Configurando base de datos...', 'info');
+    google.script.run
+      .withSuccessHandler(function(result) {
+        if (result.success) {
+          showMessage('Base de datos configurada correctamente', 'success');
+          // Intentar cargar datos nuevamente
+          setTimeout(sheetData, 2000);
+        } else {
+          showMessage('Error al configurar base de datos: ' + result.error, 'error');
+        }
+      })
+      .withFailureHandler(function(error) {
+        showMessage('Error al configurar base de datos: ' + error, 'error');
+      })
+      .configurarBaseDatos();
   }
   
   sheetData();
@@ -670,36 +993,36 @@
   const clearOrderBtn = document.getElementById('clear-order');
   if (clearOrderBtn) {
       clearOrderBtn.addEventListener('click', () => {
-      order.clearOrder();
+          order.clearOrder();
       });
   }
-  
+
   // Listener seguro para paypad-show
   const paypadShowBtns = document.querySelectorAll('.paypad-show');
   if (paypadShowBtns && paypadShowBtns.length > 0) {
       paypadShowBtns.forEach(button => {
-      button.addEventListener('click', () => {
-          Ui.showPaypad(order);
-          order.changePayment(JSON.parse(button.getAttribute("data-payment-type")));
+          button.addEventListener('click', () => {
+              Ui.showPaypad(order);
+              order.changePayment(JSON.parse(button.getAttribute("data-payment-type")));
           });
       });
   }
-  
+
   // Listener seguro para paypad-close
   const paypadCloseBtn = document.getElementById('paypad-close');
   if (paypadCloseBtn) {
       paypadCloseBtn.addEventListener('click', () => {
-      order.clearPayment();
-      Ui.hidePaypad(order);
+          order.clearPayment();
+          Ui.hidePaypad(order);
       });
   }
-  
+
   // Listener seguro para paypad-btn
   const paypadBtns = document.querySelectorAll('.paypad-btn');
   if (paypadBtns && paypadBtns.length > 0) {
       paypadBtns.forEach(button => {
-      button.addEventListener('click', () => {
-          Utilities.paypad(button.getAttribute("data-id"), order);
+          button.addEventListener('click', () => {
+              Utilities.paypad(button.getAttribute("data-id"), order);
           });
       });
   }
@@ -749,27 +1072,27 @@
   
   // Evento para mostrar la vista de órdenes
   if (verOrdenesBtn && mainView && ordenesView) {
-  verOrdenesBtn.addEventListener('click', () => {
-    mainView.style.display = 'none';
-    ordenesView.style.display = 'flex';
+    verOrdenesBtn.addEventListener('click', () => {
+      mainView.style.display = 'none';
+      ordenesView.style.display = 'flex';
       if (typeof cargarUltimasOrdenes === 'function') cargarUltimasOrdenes();
-  });
+    });
   }
   
   // Evento para volver al POS
   if (volverPosBtn && mainView && ordenesView && ordenDetalle) {
-  volverPosBtn.addEventListener('click', () => {
-    ordenesView.style.display = 'none';
-    ordenDetalle.style.display = 'none';
-    mainView.style.display = 'flex';
-  });
+    volverPosBtn.addEventListener('click', () => {
+      ordenesView.style.display = 'none';
+      ordenDetalle.style.display = 'none';
+      mainView.style.display = 'flex';
+    });
   }
   
   // Evento para ir al panel de administración
   if (adminPanelBtn) {
-  adminPanelBtn.addEventListener('click', () => {
-    window.location.href = window.location.href + '?mode=reports';
-  });
+    adminPanelBtn.addEventListener('click', () => {
+      window.location.href = window.location.href + '?mode=reports';
+    });
   }
   
   // Función para cargar las últimas órdenes
@@ -939,8 +1262,8 @@
     const cerrarDetalleBtn = document.getElementById('cerrar-detalle');
     if (cerrarDetalleBtn) {
       cerrarDetalleBtn.addEventListener('click', () => {
-      ordenDetalle.style.display = 'none';
-    });
+        ordenDetalle.style.display = 'none';
+      });
     }
     
     // Evento para reimprimir desde el detalle
@@ -949,7 +1272,7 @@
       reimprimirBtn.addEventListener('click', () => {
         const ordenNum = reimprimirBtn.getAttribute('data-orden');
         if (typeof reimprimirFactura === 'function') reimprimirFactura(ordenNum);
-    });
+      });
     }
   }
   
@@ -1097,10 +1420,15 @@
       // Espera a que el menú esté renderizado y el invoice number generado
       const checkReady = () => {
         const menuReady = document.querySelectorAll('.product-card').length > 0;
-        const invoiceReady = document.getElementById('invoice-number') && document.getElementById('invoice-number').textContent.includes('Invoice#');
+        const invoiceReady = document.getElementById('invoice-number') && document.getElementById('invoice-number').textContent.includes('#');
         if (menuReady && invoiceReady) {
           const loader = document.getElementById('initial-loader');
           if (loader) loader.style.display = 'none';
+          
+          // Actualizar el carrito flotante una vez que el sistema esté listo
+          if (typeof updateFloatingCart === 'function') {
+            updateFloatingCart();
+          }
         } else {
           setTimeout(checkReady, 100); // Reintenta hasta que esté listo
         }
@@ -1110,7 +1438,7 @@
     hideInitialLoaderWhenReady();
 
     // Lógica robusta para todos los métodos de pago
-    const paymentBtns = document.querySelectorAll('.payment-btn');
+    const paymentBtns = document.querySelectorAll('.payment-method-btn');
     paymentBtns.forEach(btn => {
       btn.addEventListener('click', function() {
         // Quitar clase activa de todos
@@ -1127,5 +1455,359 @@
         }
       });
     });
+
+    // Event listener para el botón "Cerrar Venta"
+    const closeSaleBtn = document.getElementById('close-sale');
+    if (closeSaleBtn) {
+      closeSaleBtn.addEventListener('click', function() {
+        if (typeof order !== 'undefined') {
+          order.closeSale();
+        }
+      });
+    }
+
+
+    
+    // Expandir el recibo cuando se modifica la orden
+    if (typeof order !== 'undefined') {
+      const originalReceiptDetails = Ui.receiptDetails;
+      Ui.receiptDetails = function(orderInstance) {
+        try {
+          // Llamar a la función original con el contexto correcto
+          originalReceiptDetails.call(Ui, orderInstance);
+          
+          // Expandir el recibo si hay productos
+          const rightPanel = document.getElementById('right-panel');
+          if (rightPanel && orderInstance && orderInstance.order && orderInstance.order.length > 0) {
+            rightPanel.classList.add('expanded');
+          } else if (rightPanel) {
+            rightPanel.classList.remove('expanded');
+          }
+        } catch (error) {
+          console.error('Error en wrapper de receiptDetails:', error);
+        }
+      };
+    }
   });
+
+  // === NUEVAS FUNCIONES DE DESCUENTOS ===
+  
+  // Variables globales para descuentos
+  window.currentDiscount = {
+    type: null, // 'percentage' o 'fixed'
+    value: 0,
+    amount: 0
+  };
+
+  // Obtener icono según la categoría
+  function getCategoryIcon(category) {
+    const icons = {
+      'Salas': '🛋️',
+      'Colchones': '🛏️',
+      'Vehículos': '🚗',
+      'Alfombras y Tapetes': '🟫',
+      'Otros': '📦',
+      'Descuentos': '🎫',
+      'Promociones': '🏷️'
+    };
+    return icons[category] || '📦';
+  }
+
+  // Funciones de descuentos
+  function showDiscountModal() {
+    if (!order || !order.order || order.order.length === 0) {
+      showMessage('Agrega productos antes de aplicar descuentos', 'warning');
+      return;
+    }
+    
+    // Cargar promociones y descuentos de productos
+    loadProductDiscounts();
+    
+    const modal = document.getElementById('discountModal');
+    if (modal) {
+      modal.classList.add('active');
+    }
+  }
+
+  function loadProductDiscounts() {
+    const container = document.getElementById('product-discounts-container');
+    if (!container || !order || !order.menu) return;
+    
+    // Filtrar productos de la categoría "Descuentos"
+    const discountProducts = order.menu.filter(item => item.category === 'Descuentos');
+    
+    if (discountProducts.length === 0) {
+      container.innerHTML = '<p style="text-align: center; color: #666; font-style: italic;">No hay promociones disponibles</p>';
+      return;
+    }
+    
+    let html = '';
+    discountProducts.forEach(product => {
+      const icon = getCategoryIcon(product.category);
+      const priceText = product.price < 0 ? `-${formatCurrency(Math.abs(product.price))}` : formatCurrency(product.price);
+      
+      html += `
+        <div class="discount-option" onclick="addProductDiscount('${product.sku}', '${product.description}', ${product.price})">
+          <span class="discount-option-icon">${icon}</span>
+          <div class="discount-option-text">
+            <div class="discount-option-title">${product.description}</div>
+            <div class="discount-option-desc">${priceText} - ${product.tiempo || 0} min</div>
+          </div>
+        </div>
+      `;
+    });
+    
+    container.innerHTML = html;
+  }
+
+  function addProductDiscount(sku, description, price) {
+    if (!order) return;
+    
+    // Agregar el producto de descuento a la orden
+    const productData = {
+      sku: sku,
+      description: description,
+      price: price,
+      taxRate: price < 0 ? 0 : 0.16, // Descuentos negativos no tienen IVA, promociones sí
+      tiempo: 0
+    };
+    
+    order.addOrderLine(1, JSON.stringify(productData));
+    closeDiscountModal();
+    
+    const priceText = price < 0 ? `-${formatCurrency(Math.abs(price))}` : formatCurrency(price);
+    showMessage(`Promoción "${description}" agregada: ${priceText}`, 'success');
+  }
+
+  function closeDiscountModal() {
+    const modal = document.getElementById('discountModal');
+    if (modal) {
+      modal.classList.remove('active');
+    }
+  }
+
+  function selectDiscount(type, value) {
+    window.currentDiscount.type = type;
+    window.currentDiscount.value = value;
+    updateDiscountSummary();
+    closeDiscountModal();
+    
+    const discountText = type === 'percentage' ? `${value}%` : formatCurrency(value);
+    showMessage(`Descuento de ${discountText} aplicado`, 'success');
+  }
+
+  function applyCustomDiscount() {
+    const valueInput = document.getElementById('customDiscountValue');
+    const typeSelect = document.getElementById('customDiscountType');
+    
+    if (!valueInput || !typeSelect) return;
+    
+    const value = parseFloat(valueInput.value);
+    const type = typeSelect.value;
+    
+    if (!value || value <= 0) {
+      showMessage('Ingresa un valor válido para el descuento', 'warning');
+      return;
+    }
+    
+    if (type === 'percentage' && value > 100) {
+      showMessage('El descuento no puede ser mayor al 100%', 'warning');
+      return;
+    }
+    
+    selectDiscount(type, value);
+    
+    // Limpiar campos
+    valueInput.value = '';
+  }
+
+  function clearDiscount() {
+    window.currentDiscount = { type: null, value: 0, amount: 0 };
+    updateDiscountSummary();
+    showMessage('Descuento eliminado', 'info');
+  }
+
+  function updateDiscountSummary() {
+    if (!order || !order.getSummary) return;
+    
+    try {
+      // Paso 1: Obtener el resumen de la orden con subtotales e IVA
+      const summary = order.getSummary();
+      const subtotal = summary.subtotal || 0; // Suma de precios sin IVA
+      const tax = summary.tax || 0; // Suma de montos de IVA
+      
+      // Paso 2: Calcular el total con IVA (base para aplicar descuentos)
+      const totalWithTax = Utilities.roundToTwo(subtotal + tax);
+      
+      // Paso 3: Calcular descuento sobre el total final (ya incluye IVA)
+      let discountAmount = 0;
+      if (window.currentDiscount.type === 'percentage') {
+        // Descuento porcentual: total * (porcentaje / 100), redondeado a 2 decimales
+        discountAmount = Utilities.roundToTwo(totalWithTax * (window.currentDiscount.value / 100));
+      } else if (window.currentDiscount.type === 'fixed') {
+        // Descuento fijo: monto específico (sin exceder el total), redondeado a 2 decimales
+        discountAmount = Utilities.roundToTwo(Math.min(window.currentDiscount.value, totalWithTax));
+      }
+      // Guardar el monto del descuento para uso en otras funciones
+      window.currentDiscount.amount = discountAmount;
+      
+      // Paso 4: Calcular el gran total después de aplicar el descuento
+      const grandTotal = Utilities.roundToTwo(totalWithTax - discountAmount);
+      
+      // Paso 5: Actualizar la interfaz de usuario con los valores calculados
+      const discountElement = document.getElementById('discount-summary');
+      const grandTotalElement = document.getElementById('grandtotal-summary');
+      
+      if (discountElement) {
+        discountElement.textContent = formatCurrency(discountAmount);
+      }
+      if (grandTotalElement) {
+        grandTotalElement.textContent = formatCurrency(grandTotal);
+      }
+      
+    } catch (error) {
+      console.error('Error al actualizar descuento:', error);
+    }
+  }
+
+  function roundToTwo(num) {
+    return Math.round((num + Number.EPSILON) * 100) / 100;
+  }
+
+  function formatCurrency(amount) {
+    return new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency: 'MXN'
+    }).format(amount);
+  }
+
+  // Mejorar el manejo de imágenes con fallbacks
+  function improveImageHandling() {
+    // Función para crear SVG seguro
+    function createSafeSVG(width, height, icon) {
+      const svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="${width}" height="${height}" fill="#f8f9fa" stroke="#e9ecef" stroke-width="1"/>
+        <text x="${width/2}" y="${height*0.6}" font-family="Arial, sans-serif" font-size="${width*0.4}" fill="#6c757d" text-anchor="middle">${icon}</text>
+      </svg>`;
+      
+      try {
+        return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+      } catch (e) {
+        // Fallback simple si btoa falla
+        return `data:image/svg+xml;base64,${btoa('<svg width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="60" fill="#f8f9fa" stroke="#e9ecef" stroke-width="1"/><text x="30" y="36" font-family="Arial, sans-serif" font-size="24" fill="#6c757d" text-anchor="middle">📦</text></svg>')}`;
+      }
+    }
+
+    // Aplicar a imágenes de productos existentes
+    document.querySelectorAll('.product-img').forEach(img => {
+      if (!img.dataset.fallbackSet) {
+        img.dataset.fallbackSet = 'true';
+        img.onerror = function() {
+          if (!this.dataset.fallback) {
+            this.dataset.fallback = 'true';
+            const category = this.closest('.product-card')?.dataset.category || 'Otros';
+            const categoryIcon = getCategoryIcon(category);
+            this.src = createSafeSVG(60, 60, categoryIcon);
+          }
+        };
+      }
+    });
+
+    // Aplicar a imágenes de items del recibo
+    document.querySelectorAll('.detail-item-image').forEach(img => {
+      if (!img.dataset.fallbackSet) {
+        img.dataset.fallbackSet = 'true';
+        img.onerror = function() {
+          if (!this.dataset.fallback) {
+            this.dataset.fallback = 'true';
+            const category = this.closest('.detail-item-card')?.dataset.category || 'Otros';
+            const categoryIcon = getCategoryIcon(category);
+            this.src = createSafeSVG(40, 40, categoryIcon);
+          }
+        };
+      }
+    });
+  }
+
+  // Integrar descuentos en la función summary existente
+  const originalSummary = Ui.summary;
+  Ui.summary = function(orderInstance) {
+    // Llamar a la función original
+    originalSummary.call(this, orderInstance);
+    
+         // Aplicar descuentos si existen
+     if (window.currentDiscount.type && window.currentDiscount.value > 0) {
+       updateDiscountSummary();
+     }
+    
+    // Mejorar manejo de imágenes
+    setTimeout(improveImageHandling, 100);
+  };
+
+  // Event listeners para el modal de descuentos cuando el DOM esté listo
+  document.addEventListener('DOMContentLoaded', function() {
+    // Event listeners para métodos de pago si existen los elementos
+    const payCash = document.getElementById('pay-cash');
+    const payCard = document.getElementById('pay-card');
+    const payQris = document.getElementById('pay-qris');
+    
+    if (payCash) {
+      payCash.addEventListener('click', () => {
+        document.querySelectorAll('.payment-method-btn').forEach(btn => btn.classList.remove('active'));
+        payCash.classList.add('active');
+        if (order) order.payment.type = 'cash';
+      });
+    }
+    
+    if (payCard) {
+      payCard.addEventListener('click', () => {
+        document.querySelectorAll('.payment-method-btn').forEach(btn => btn.classList.remove('active'));
+        payCard.classList.add('active');
+        if (order) order.payment.type = 'card';
+      });
+    }
+    
+    if (payQris) {
+      payQris.addEventListener('click', () => {
+        document.querySelectorAll('.payment-method-btn').forEach(btn => btn.classList.remove('active'));
+        payQris.classList.add('active');
+        if (order) order.payment.type = 'qris';
+      });
+    }
+
+    // Mejorar imágenes inicialmente
+    setTimeout(improveImageHandling, 500);
+  });
+
+  // Función mejorada para mostrar mensajes
+  function showMessage(message, type = 'info', duration = 3000) {
+    let container = document.querySelector('.message-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.className = 'message-container';
+      document.body.appendChild(container);
+    }
+
+    const messageEl = document.createElement('div');
+    messageEl.className = `message message-${type}`;
+    messageEl.textContent = message;
+
+    container.appendChild(messageEl);
+
+    setTimeout(() => {
+      messageEl.style.animation = 'slideOut 0.3s ease-in forwards';
+      setTimeout(() => messageEl.remove(), 300);
+    }, duration);
+  }
+
+  // Exponer funciones globalmente para el HTML
+  window.showDiscountModal = showDiscountModal;
+  window.closeDiscountModal = closeDiscountModal;
+  window.selectDiscount = selectDiscount;
+  window.applyCustomDiscount = applyCustomDiscount;
+  window.clearDiscount = clearDiscount;
+  window.showMessage = showMessage;
+  window.loadProductDiscounts = loadProductDiscounts;
+  window.addProductDiscount = addProductDiscount;
+
 </script>

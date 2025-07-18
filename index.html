@@ -3,9 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css" />
-    <link rel="preconnect" href="https://fonts.gstatic.com">
-    <link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Libre+Barcode+128&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <?!= include("styles-css"); ?>
     <title>POS Lavasmart</title>
 </head>
@@ -13,89 +10,191 @@
   <div class="pos-root-layout">
     <!-- Sidebar vertical solo iconos -->
     <aside class="sidebar-vertical">
-      <button class="sidebar-icon" title="POS"><i class="fas fa-store"></i></button>
-      <button class="sidebar-icon" title="Órdenes"><i class="fas fa-list-alt"></i></button>
-      <button class="sidebar-icon" title="Calendario"><i class="fas fa-calendar-alt"></i></button>
-      <button class="sidebar-icon" title="Reportes"><i class="fas fa-chart-bar"></i></button>
-      <button class="sidebar-icon" title="Ajustes"><i class="fas fa-cog"></i></button>
+      <button class="sidebar-icon" title="POS"><span class="icon-home"></span></button>
+      <button class="sidebar-icon" title="Órdenes"><span class="icon-history"></span></button>
+      <button class="sidebar-icon" title="Calendario"><span class="icon-calendar"></span></button>
+      <button class="sidebar-icon" title="Reportes"><span class="icon-chart"></span></button>
+      <button class="sidebar-icon" title="Ajustes"><span class="icon-settings"></span></button>
     </aside>
+    
     <!-- Panel central -->
     <main class="main-panel">
       <header class="main-header">
-        <div class="search-bar search-bar-main">
-            <i class="fas fa-search"></i>
-            <input type="text" id="search-product" placeholder="Buscar producto...">
+        <div class="search-bar">
+          <span class="icon-search"></span>
+          <input type="text" id="search-product" placeholder="Buscar producto...">
         </div>
         <div class="user-profile">
-          <img src="https://randomuser.me/api/portraits/lego/1.jpg" alt="Usuario" class="user-avatar">
+          <div class="user-avatar">👤</div>
           <span class="user-name">Lavasmart</span>
         </div>
       </header>
+      
       <section class="categories-bar">
-        <button class="category-btn active" data-category="all"><i class="fas fa-th-large"></i></button>
-        <button class="category-btn" data-category="Salas"><i class="fas fa-couch"></i></button>
-        <button class="category-btn" data-category="Colchones"><i class="fas fa-bed"></i></button>
-        <button class="category-btn" data-category="Vehículos"><i class="fas fa-car"></i></button>
-        <button class="category-btn" data-category="Alfombras y Tapetes"><i class="fas fa-border-all"></i></button>
-        <button class="category-btn" data-category="Otros"><i class="fas fa-box"></i></button>
-        <button class="category-btn" data-category="Descuentos"><i class="fas fa-tags"></i></button>
-        <button class="category-btn" data-category="Promociones"><i class="fas fa-gift"></i></button>
+        <button class="category-btn active" data-category="all">Todos</button>
+        <button class="category-btn" data-category="Salas">Salas</button>
+        <button class="category-btn" data-category="Colchones">Colchones</button>
+        <button class="category-btn" data-category="Vehículos">Vehículos</button>
+        <button class="category-btn" data-category="Alfombras y Tapetes">Alfombras</button>
+        <button class="category-btn" data-category="Otros">Otros</button>
+        <button class="category-btn" data-category="Descuentos">Descuentos</button>
       </section>
+      
       <section class="products-grid" id="menu">
         <!-- Aquí van los productos (cards) -->
-            </section>
+      </section>
     </main>
+    
     <!-- Panel derecho: recibo y totales -->
     <aside class="right-panel">
-      <div class="receipt-panel">
-        <div class="receipt-header-modern">
-          <div class="receipt-title-row">
+      <div class="receipt-header">
             <h3 class="receipt-title">Recibo</h3>
-            <span class="receipt-invoice" id="invoice-number"></span>
-                    </div>
-          <div class="receipt-meta">
-            <span id="receipt-date"></span>
-                    </div>
-                    </div>
-        <div class="receipt-table-modern">
-          <div class="receipt-table-header">
-            <span class="rth-desc">Descripción</span>
-            <span class="rth-qty">Cant.</span>
-            <span class="rth-unit">P. Unit.</span>
-            <span class="rth-sub">Subtotal</span>
-            <span class="rth-del"></span>
-                    </div>
-          <ul class="receipt-list" id="receipt-details">
-            <!-- Items del recibo -->
-          </ul>
-                </div>
-        <div class="receipt-summary-modern">
-          <div class="receipt-row"><span>Subtotal</span><span id="subtotal-summary">$0.00</span></div>
-          <div class="receipt-row"><span>Descuento</span><span id="discount-summary">$0.00</span></div>
-          <div class="receipt-row"><span>IVA</span><span id="tax-summary">$0.00</span></div>
-          <div class="receipt-row total"><span>Total</span><span id="grandtotal-summary">$0.00</span></div>
-                </div>
-        <div class="payment-method-panel">
-          <span class="payment-title">Método de pago</span>
-          <div class="payment-methods">
-            <button class="payment-btn" id="pay-cash">Efectivo</button>
-            <button class="payment-btn active" id="pay-card">Tarjeta</button>
-                </div>
+        <div class="receipt-info">
+          <span id="invoice-number"># 001</span>
+          <br>
+          <small id="receipt-date">Orden: 15/01/25, 7:10 p.m.</small>
         </div>
-        <button class="main-action-btn" id="close-sale">Cerrar Venta</button>
-            </div>
+          </div>
+      
+      <div class="receipt-details" id="receipt-details">
+        <!-- Items del recibo aparecen aquí -->
+          </div>
+      
+      <div class="receipt-summary">
+        <div class="summary-row">
+          <span id="items-count">0 (Items)</span>
+          <span id="total-time">0 min</span>
+        </div>
+        <div class="summary-row">
+          <span>Subtotal (sin IVA):</span>
+          <span id="subtotal-summary">$0.00</span>
+          </div>
+        <div class="summary-row">
+          <span>Descuentos:</span>
+          <span id="discount-summary">$0.00</span>
+          <button class="discount-btn" onclick="showDiscountModal()" title="Aplicar descuento">
+            <span class="icon-discount">🎫</span>
+          </button>
+          <button class="discount-btn" onclick="clearDiscount()" title="Limpiar descuento" style="background: var(--danger); margin-left: 4px;">
+            <span class="icon-discount">❌</span>
+          </button>
+          </div>
+        <div class="summary-row" id="subtotal-after-discount-row" style="display: none;">
+          <span>Subtotal después descuento:</span>
+          <span id="subtotal-after-discount">$0.00</span>
+          </div>
+        <div class="summary-row">
+          <span>IVA (16%):</span>
+          <span id="tax-summary">$0.00</span>
+          </div>
+        <div class="summary-row total">
+          <span>Total:</span>
+          <span id="grandtotal-summary">$0.00</span>
+        </div>
+        
+        <div class="payment-methods">
+            <button class="payment-method-btn" id="pay-cash">
+            <span class="icon-cash"></span>
+              <span>Cash</span>
+            </button>
+            <button class="payment-method-btn active" id="pay-card">
+            <span class="icon-card"></span>
+              <span>Debit</span>
+            </button>
+            <button class="payment-method-btn" id="pay-qris">
+            <span class="icon-mobile"></span>
+              <span>QRIS</span>
+            </button>
+        </div>
+        
+        <button class="close-sale-btn" id="close-sale">Cerrar Venta</button>
+      </div>
     </aside>
-            </div>
+  </div>
+  
+  <!-- Modal de Descuentos -->
+  <div class="discount-modal" id="discountModal">
+    <div class="discount-content">
+      <div class="discount-header">
+        <h3 class="discount-title">Aplicar Descuento sobre el Total</h3>
+        <button class="close-modal" onclick="closeDiscountModal()">×</button>
+      </div>
+      
+      <div class="discount-options">
+        <h4 style="margin: 0 0 12px 0; font-size: 14px; color: #333;">Descuentos Porcentuales</h4>
+        <div class="discount-option" onclick="selectDiscount('percentage', 10)">
+          <span class="discount-option-icon">🎯</span>
+          <div class="discount-option-text">
+            <div class="discount-option-title">10% Descuento</div>
+            <div class="discount-option-desc">10% sobre el total (con IVA)</div>
+          </div>
+        </div>
+        
+        <div class="discount-option" onclick="selectDiscount('percentage', 15)">
+          <span class="discount-option-icon">🎉</span>
+          <div class="discount-option-text">
+            <div class="discount-option-title">15% Descuento</div>
+            <div class="discount-option-desc">15% sobre el total (con IVA)</div>
+          </div>
+        </div>
+        
+        <div class="discount-option" onclick="selectDiscount('percentage', 20)">
+          <span class="discount-option-icon">🏆</span>
+          <div class="discount-option-text">
+            <div class="discount-option-title">20% Descuento</div>
+            <div class="discount-option-desc">20% sobre el total (con IVA)</div>
+          </div>
+        </div>
+        
+        <h4 style="margin: 20px 0 12px 0; font-size: 14px; color: #333;">Descuentos Fijos</h4>
+        <div class="discount-option" onclick="selectDiscount('fixed', 100)">
+          <span class="discount-option-icon">💰</span>
+          <div class="discount-option-text">
+            <div class="discount-option-title">$100 Descuento</div>
+            <div class="discount-option-desc">$100 sobre el total (con IVA)</div>
+          </div>
+        </div>
+        
+        <div class="discount-option" onclick="selectDiscount('fixed', 200)">
+          <span class="discount-option-icon">💎</span>
+          <div class="discount-option-text">
+            <div class="discount-option-title">$200 Descuento</div>
+            <div class="discount-option-desc">$200 sobre el total (con IVA)</div>
+          </div>
+        </div>
+        
+        <h4 style="margin: 20px 0 12px 0; font-size: 14px; color: #333;">Promociones y Descuentos de Productos</h4>
+        <div id="product-discounts-container">
+          <!-- Aquí se cargarán dinámicamente las promociones y descuentos de productos -->
+        </div>
+      </div>
+      
+      <div class="custom-discount">
+        <h4 style="margin: 0 0 8px 0; font-size: 14px;">Descuento Personalizado sobre el Total</h4>
+        <input type="number" id="customDiscountValue" placeholder="Ingresa el valor del descuento" min="0" step="0.01">
+        <select id="customDiscountType" style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;">
+          <option value="percentage">Porcentaje (%) sobre el total</option>
+          <option value="fixed">Monto fijo ($) sobre el total</option>
+        </select>
+      </div>
+      
+      <div class="discount-actions">
+        <button class="btn-cancel" onclick="closeDiscountModal()">Cancelar</button>
+        <button class="btn-apply" onclick="applyCustomDiscount()">Aplicar Descuento</button>
+      </div>
+    </div>
+  </div>
+  
   <!-- Loader inicial -->
   <div id="initial-loader" style="position:fixed;z-index:2000;top:0;left:0;width:100vw;height:100vh;background:rgba(255,255,255,0.95);display:flex;align-items:center;justify-content:center;">
     <div style="display:flex;flex-direction:column;align-items:center;">
       <div class="loader-spinner" style="border:6px solid #f3f3f3;border-top:6px solid #ff6384;border-radius:50%;width:60px;height:60px;animation:spin 1s linear infinite;"></div>
       <span style="margin-top:18px;font-size:1.2em;color:#ff6384;">Cargando sistema...</span>
-            </div>
-        </div>
+    </div>
+  </div>
   <style>
     @keyframes spin { 0% { transform: rotate(0deg);} 100% { transform: rotate(360deg);} }
   </style>
-    <?!= include("script-js"); ?>
+  <?!= include("script-js"); ?>
 </body>
 </html>

@@ -1,46 +1,56 @@
 #!/bin/bash
 
-# Límite de deployments permitidos
-MAX_DEPLOYMENTS=15
-KEEP_DEPLOYMENTS=10
+echo "🚀 Desplegando Lavasmart POS a Google Apps Script..."
 
-echo "Verificando cantidad de deployments activos..."
-DEPLOY_IDS=($(npx clasp deployments | grep -oE 'AKfy[\w-]+' | tac))
-DEPLOY_COUNT=${#DEPLOY_IDS[@]}
-
-if [ "$DEPLOY_COUNT" -gt "$MAX_DEPLOYMENTS" ]; then
-  echo "Hay $DEPLOY_COUNT deployments. Eliminando los más antiguos..."
-  # Eliminar los más antiguos, dejando solo los KEEP_DEPLOYMENTS más recientes
-  for ((i=KEEP_DEPLOYMENTS; i<DEPLOY_COUNT; i++)); do
-    echo "Eliminando deployment: ${DEPLOY_IDS[$i]}"
-    npx clasp undeploy "${DEPLOY_IDS[$i]}"
-  done
-else
-  echo "No es necesario limpiar deployments ($DEPLOY_COUNT activos)"
+# Verificar que clasp esté instalado
+if ! command -v clasp &> /dev/null; then
+    echo "❌ Error: clasp no está instalado. Instálalo con: npm install -g @google/clasp"
+    exit 1
 fi
 
-# Deployment ID fijo para tu proyecto
-DEPLOYMENT_ID="AKfycbxwMg6kP2_Ff49BK94aIJZhbNEGqht8pcUuU3x1lvLowo2Lx0z_rUVua0CPAHNKzL9sNg"
-
-echo "Haciendo push..."
-clasp push --force || { echo "Error en clasp push"; exit 1; }
-
-echo "Creando nueva versión..."
-clasp version "Auto: actualización rápida" || { echo "Error en clasp version"; exit 1; }
-
-echo "Actualizando el deployment existente..."
-OUTPUT=$(clasp deploy --deploymentId "$DEPLOYMENT_ID" --description "Auto: actualización rápida")
-
-WEBAPP_URL=$(echo "$OUTPUT" | grep -Eo 'https://script.google.com/macros/s/[a-zA-Z0-9_-]*/exec')
-
-if [ -n "$WEBAPP_URL" ]; then
-  echo "\n¡Despliegue exitoso! Link de la app web:"
-  echo "$WEBAPP_URL"
-else
-  echo "$OUTPUT"
-  echo "\nNo se pudo extraer el link de la app web. Revisa la salida anterior."
+# Verificar que estemos en el directorio correcto
+if [ ! -f ".clasp.json" ]; then
+    echo "❌ Error: No se encontró .clasp.json. Asegúrate de estar en el directorio del proyecto."
+    exit 1
 fi
+
+echo "📁 Directorio actual: $(pwd)"
+echo "📋 Archivos a desplegar:"
+ls -la *.html *.js 2>/dev/null || echo "No se encontraron archivos HTML/JS"
+
+# Hacer push de los archivos
+echo "📤 Subiendo archivos a Google Apps Script..."
+clasp push
+
+if [ $? -eq 0 ]; then
+    echo "✅ Archivos subidos exitosamente"
+else
+    echo "❌ Error al subir archivos"
+    exit 1
+fi
+
+# Crear nuevo deployment
+echo "🚀 Creando nuevo deployment..."
+DEPLOYMENT_ID=$(clasp deploy 2>&1 | grep -o 'AKfycb[^[:space:]]*')
+
+if [ -n "$DEPLOYMENT_ID" ]; then
+    echo "✅ Deployment creado: $DEPLOYMENT_ID"
+else
+    echo "❌ Error al crear deployment"
+    exit 1
+fi
+
+# Obtener la URL de la aplicación web
+SCRIPT_ID=$(grep -o '"scriptId": "[^"]*"' .clasp.json | cut -d'"' -f4)
+WEB_APP_URL="https://script.google.com/a/macros/lavasmart.mx/s/$DEPLOYMENT_ID/exec"
 
 echo ""
-echo "Link de la app web:"
-echo "https://script.google.com/macros/s/$DEPLOYMENT_ID/exec" 
+echo "🎉 ¡Deployment completado exitosamente!"
+echo ""
+echo "📱 URL de la aplicación web:"
+echo "$WEB_APP_URL"
+echo ""
+echo "🔗 Deployment ID: $DEPLOYMENT_ID"
+echo ""
+echo "💡 Para abrir en el navegador, copia y pega la URL anterior"
+echo "📝 Nota: La primera vez que accedas, Google puede pedir autorización" 

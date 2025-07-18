@@ -4,6 +4,133 @@
  */
 
 /**
+ * Configura la base de datos inicial con productos de Lavasmart
+ * Crea las hojas necesarias y los datos de productos de prueba
+ */
+function configurarBaseDatos() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // Crear hoja Items si no existe
+    let itemsSheet = ss.getSheetByName("Items");
+    if (!itemsSheet) {
+      itemsSheet = ss.insertSheet("Items");
+    }
+    
+    // Crear hoja Sales si no existe
+    let salesSheet = ss.getSheetByName("Sales");
+    if (!salesSheet) {
+      salesSheet = ss.insertSheet("Sales");
+    }
+    
+    // Crear hoja Payments si no existe
+    let paymentsSheet = ss.getSheetByName("Payments");
+    if (!paymentsSheet) {
+      paymentsSheet = ss.insertSheet("Payments");
+    }
+    
+    // Configurar encabezados de Items
+    const itemsHeaders = [
+      "SKU", "Descripción", "Precio", "Tasa Impuesto", "Imagen", 
+      "Tiempo (min)", "Nombre Archivo", "Precio Ideal", "Categoría"
+    ];
+    itemsSheet.getRange(1, 1, 1, itemsHeaders.length).setValues([itemsHeaders]);
+    
+    // Productos de Lavasmart
+    const productosLavasmart = [
+      ["001", "Sala Chica (3,2,1)", 950.00, 0.16, "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=300", 35, "sala_chica.jpg", 950.00, "Salas"],
+      ["002", "Sala Grande (+6p)", 950.00, 0.16, "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=300", 40, "sala_grande.jpg", 950.00, "Salas"],
+      ["003", "Sofá 2 Plazas", 750.00, 0.16, "https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?w=300", 20, "sofa_2_plazas.jpg", 750.00, "Salas"],
+      ["004", "Sofá de 3 Plazas", 750.00, 0.16, "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=300", 20, "sofa_3_plazas.jpg", 750.00, "Salas"],
+      ["005", "Sofá Esquinera o en L Chica", 850.00, 0.16, "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=300", 35, "sofa_esquinera_chica.jpg", 850.00, "Salas"],
+      ["006", "Sofá Esquinera o L Mediana", 950.00, 0.16, "https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?w=300", 35, "sofa_esquinera_mediana.jpg", 950.00, "Salas"],
+      ["007", "Colchón Individual", 450.00, 0.16, "https://images.unsplash.com/photo-1540574163026-643ea20ade25?w=300", 15, "colchon_individual.jpg", 450.00, "Colchones"],
+      ["008", "Colchón Matrimonial", 550.00, 0.16, "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=300", 20, "colchon_matrimonial.jpg", 550.00, "Colchones"],
+      ["009", "Colchón Queen Size", 650.00, 0.16, "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=300", 25, "colchon_queen.jpg", 650.00, "Colchones"],
+      ["010", "Colchón King Size", 750.00, 0.16, "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=300", 30, "colchon_king.jpg", 750.00, "Colchones"],
+      ["011", "Auto Sedan", 450.00, 0.16, "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=300", 45, "auto_sedan.jpg", 450.00, "Vehículos"],
+      ["012", "Auto SUV/Camioneta", 550.00, 0.16, "https://images.unsplash.com/photo-1494905998402-395d579af36f?w=300", 60, "auto_suv.jpg", 550.00, "Vehículos"],
+      ["013", "Alfombra Pequeña", 250.00, 0.16, "https://images.unsplash.com/photo-1506439773649-6e0eb8cfb237?w=300", 15, "alfombra_pequena.jpg", 250.00, "Alfombras y Tapetes"],
+      ["014", "Alfombra Mediana", 350.00, 0.16, "https://images.unsplash.com/photo-1603480031269-b5c9f7b2e3c8?w=300", 25, "alfombra_mediana.jpg", 350.00, "Alfombras y Tapetes"],
+      ["015", "Alfombra Grande", 450.00, 0.16, "https://images.unsplash.com/photo-1506439773649-6e0eb8cfb237?w=300", 35, "alfombra_grande.jpg", 450.00, "Alfombras y Tapetes"],
+      ["016", "Tapete de Auto", 150.00, 0.16, "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=300", 10, "tapete_auto.jpg", 150.00, "Alfombras y Tapetes"],
+      ["017", "Servicio Express", 200.00, 0.16, "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=300", 15, "servicio_express.jpg", 200.00, "Otros"],
+      ["018", "Descuento 10%", -50.00, 0.00, "https://images.unsplash.com/photo-1607083206869-4c7672e72a8a?w=300", 0, "descuento_10.jpg", -50.00, "Descuentos"],
+      ["019", "Promo 2x1 Colchones", 550.00, 0.16, "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=300", 40, "promo_2x1_colchones.jpg", 1100.00, "Descuentos"],
+      ["020", "Paquete Sala Completa", 1800.00, 0.16, "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=300", 90, "paquete_sala_completa.jpg", 1800.00, "Descuentos"]
+    ];
+    
+    // Agregar productos a la hoja
+    if (productosLavasmart.length > 0) {
+      itemsSheet.getRange(2, 1, productosLavasmart.length, productosLavasmart[0].length).setValues(productosLavasmart);
+    }
+    
+    // Configurar encabezados de Sales
+    const salesHeaders = ["Fecha", "Número Factura", "SKU", "Cantidad", "Precio", "Impuesto"];
+    salesSheet.getRange(1, 1, 1, salesHeaders.length).setValues([salesHeaders]);
+    
+    // Configurar encabezados de Payments
+    const paymentsHeaders = ["Fecha", "Número Factura", "Total", "Método Pago", "Cambio"];
+    paymentsSheet.getRange(1, 1, 1, paymentsHeaders.length).setValues([paymentsHeaders]);
+    
+    // Formatear las hojas
+    itemsSheet.getRange(1, 1, 1, itemsHeaders.length).setFontWeight('bold').setBackground('#e1f5fe');
+    salesSheet.getRange(1, 1, 1, salesHeaders.length).setFontWeight('bold').setBackground('#e8f5e8');
+    paymentsSheet.getRange(1, 1, 1, paymentsHeaders.length).setFontWeight('bold').setBackground('#fff3e0');
+    
+    // Ajustar ancho de columnas
+    itemsSheet.autoResizeColumns(1, itemsHeaders.length);
+    salesSheet.autoResizeColumns(1, salesHeaders.length);
+    paymentsSheet.autoResizeColumns(1, paymentsHeaders.length);
+    
+    return { success: true, message: "Base de datos configurada correctamente con " + productosLavasmart.length + " productos" };
+  } catch (error) {
+    Logger.log("Error en configurarBaseDatos: " + error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Genera un número de factura único
+ * @return {number} Número de factura único
+ */
+function generateInvoiceNumber() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const salesSheet = ss.getSheetByName("Sales");
+    
+    if (!salesSheet) {
+      // Si no existe la hoja de ventas, empezar desde 1
+      return 1;
+    }
+    
+    const lastRow = salesSheet.getLastRow();
+    if (lastRow <= 1) {
+      // Si solo hay encabezados, empezar desde 1
+      return 1;
+    }
+    
+    // Obtener todos los números de factura existentes
+    const invoiceNumbers = salesSheet.getRange(2, 2, lastRow - 1, 1).getValues();
+    
+    // Encontrar el número más alto
+    let maxInvoiceNumber = 0;
+    invoiceNumbers.forEach(row => {
+      const num = parseInt(row[0]);
+      if (!isNaN(num) && num > maxInvoiceNumber) {
+        maxInvoiceNumber = num;
+      }
+    });
+    
+    return maxInvoiceNumber + 1;
+  } catch (error) {
+    Logger.log("Error en generateInvoiceNumber: " + error.message);
+    // En caso de error, usar timestamp como fallback
+    return Date.now() % 100000;
+  }
+}
+
+/**
  * Función que se ejecuta cuando se abre la aplicación web
  * @param {Object} e - Objeto de evento con parámetros de URL
  * @return {HtmlOutput} Página HTML renderizada
@@ -77,6 +204,14 @@ function getData() {
     const itemsLastRow = itemsSheet.getLastRow();
     if (itemsLastRow > 1) {
       result.items = itemsSheet.getRange(2, 1, itemsLastRow - 1, ITEMS_COLUMNS).getValues();
+      
+      // DEBUG: Verificar las tasas de impuesto en los datos cargados
+      Logger.log("DEBUG: Verificando tasas de impuesto en los datos cargados:");
+      result.items.forEach((item, index) => {
+        if (index < 5) { // Solo los primeros 5 para no saturar el log
+          Logger.log(`Producto ${index + 1}: SKU=${item[0]}, Descripción=${item[1]}, Precio=${item[2]}, TaxRate=${item[3]}`);
+        }
+      });
     } else {
       result.items = [];
     }
@@ -609,6 +744,62 @@ function reimprimirFactura(invoiceNumber) {
     };
   } catch (error) {
     Logger.log("Error en reimprimirFactura: " + error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Corrige las tasas de impuesto en la hoja de Items
+ * Esta función verifica y corrige las tasas de impuesto que deberían ser 0.16 (16%)
+ * @return {Object} Resultado de la operación
+ */
+function corregirTasasImpuesto() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const itemsSheet = ss.getSheetByName("Items");
+    
+    if (!itemsSheet) {
+      throw new Error("No se encontró la hoja Items");
+    }
+    
+    const itemsLastRow = itemsSheet.getLastRow();
+    if (itemsLastRow <= 1) {
+      return { success: true, message: "No hay productos para corregir" };
+    }
+    
+    // Obtener todos los datos de productos
+    const itemsData = itemsSheet.getRange(2, 1, itemsLastRow - 1, 9).getValues();
+    let correcciones = 0;
+    
+    // Verificar y corregir cada producto
+    itemsData.forEach((item, index) => {
+      const sku = item[0];
+      const descripcion = item[1];
+      const precio = item[2];
+      const taxRate = item[3];
+      const categoria = item[8];
+      
+      // Solo aplicar 16% de IVA a productos que no sean descuentos
+      // y que tengan precio positivo
+      if (precio > 0 && 
+          categoria !== 'Descuentos' && 
+          taxRate !== 0.16) {
+        
+        // Corregir la tasa de impuesto a 0.16
+        itemsSheet.getRange(index + 2, 4).setValue(0.16);
+        correcciones++;
+        
+        Logger.log(`Corregida tasa de impuesto para ${sku} (${descripcion}): ${taxRate} -> 0.16`);
+      }
+    });
+    
+    return { 
+      success: true, 
+      message: `Se corrigieron ${correcciones} tasas de impuesto`,
+      correcciones: correcciones
+    };
+  } catch (error) {
+    Logger.log("Error en corregirTasasImpuesto: " + error.message);
     return { success: false, error: error.message };
   }
 }

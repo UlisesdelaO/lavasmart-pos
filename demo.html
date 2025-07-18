@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lavasmart POS - Demo</title>
+    
+    <!-- Estilos locales sin dependencias externas -->
+    <style>
+        /* Variables CSS */
+        :root {
+            --primary: #6C63FF;
+            --primary-dark: #4B47B6;
+            --secondary: #FF6584;
+            --background: #181A20;
+            --surface: #23263A;
+            --surface-light: #2D3147;
+            --surface-lighter: #35395a;
+            --text-light: #F8F9FA;
+            --text-dark: #23263A;
+            --accent: #00C9A7;
+            --danger: #FF5252;
+            --success: #4CAF50;
+            --warning: #FFC107;
+            --shadow: rgba(0,0,0,0.10);
+            --border-radius: 14px;
+            --spacing: 16px;
+            --spacing-sm: 8px;
+            --spacing-lg: 32px;
+            --receipt-bg: #f5f6fa;
+        }
+
+        /* Iconos usando Unicode y símbolos del sistema */
+        .icon-home:before { content: "🏠"; }
+        .icon-history:before { content: "📋"; }
+        .icon-calendar:before { content: "📅"; }
+        .icon-chart:before { content: "📊"; }
+        .icon-settings:before { content: "⚙️"; }
+        .icon-search:before { content: "🔍"; }
+        .icon-plus:before { content: "+"; }
+        .icon-minus:before { content: "-"; }
+        .icon-trash:before { content: "🗑️"; }
+        .icon-card:before { content: "💳"; }
+        .icon-cash:before { content: "💵"; }
+        .icon-mobile:before { content: "📱"; }
+        .icon-clock:before { content: "⏱️"; }
+        .icon-receipt:before { content: "🧾"; }
+        .icon-user:before { content: "👤"; }
+        .icon-logout:before { content: "🚪"; }
+        
+        /* Estilos base */
+        body {
+            background: #fdeeee;
+            color: var(--text-dark);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            margin: 0;
+            min-height: 100vh;
+        }
+
+        .pos-root-layout {
+            display: flex;
+            height: 100vh;
+            background: #fdeeee;
+        }
+
+        /* Sidebar */
+        .sidebar-vertical {
+            background: var(--surface);
+            width: 70px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: var(--spacing) 0;
+            gap: var(--spacing);
+        }
+
+        .sidebar-icon {
+            width: 50px;
+            height: 50px;
+            background: none;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+        }
+
+        .sidebar-icon:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Panel principal */
+        .main-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 12px;
+            gap: 12px;
+        }
+
+        .main-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: white;
+            padding: 12px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 8px var(--shadow);
+        }
+
+        .search-bar {
+            position: relative;
+            flex: 1;
+            max-width: 400px;
+        }
+
+        .search-bar input {
+            width: 100%;
+            padding: 12px 40px 12px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 16px;
+            background: #f8f9fa;
+        }
+
+        .search-bar .icon-search {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6c757d;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: white;
+        }
+
+        /* Categorías */
+        .categories-bar {
+            display: flex;
+            gap: 8px;
+            background: white;
+            padding: 10px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 8px var(--shadow);
+            overflow-x: auto;
+        }
+
+        .category-btn {
+            padding: 8px 12px;
+            border: 1px solid var(--secondary);
+            background: none;
+            color: var(--secondary);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 12px;
+            white-space: nowrap;
+            font-weight: 500;
+        }
+
+        .category-btn.active,
+        .category-btn:hover {
+            background: var(--secondary);
+            color: white;
+        }
+
+        /* Grid de productos */
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px;
+            flex: 1;
+            overflow-y: auto;
+            background: white;
+            padding: 12px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 8px var(--shadow);
+        }
+
+        .product-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            position: relative;
+            min-height: 140px;
+        }
+
+        .product-card:hover {
+            border-color: var(--secondary);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px var(--shadow);
+        }
+
+        .product-img {
+            width: 60px;
+            height: 60px;
+            object-fit: contain;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .product-img:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+
+        .product-title {
+            font-weight: 500;
+            margin-bottom: 3px;
+            font-size: 12px;
+            line-height: 1.2;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+
+        .product-time {
+            color: #6c757d;
+            font-size: 10px;
+            margin-bottom: 4px;
+        }
+
+        .product-price {
+            font-weight: 700;
+            color: var(--secondary);
+            font-size: 14px;
+            margin-bottom: 6px;
+        }
+
+        .add-to-bill-btn {
+            background: var(--secondary);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+            font-size: 11px;
+            width: 100%;
+            margin-top: auto;
+        }
+
+        .add-to-bill-btn:hover {
+            background: #e5576c;
+        }
+
+        /* Panel derecho */
+        .right-panel {
+            width: 320px;
+            background: var(--receipt-bg);
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid #e0e0e0;
+        }
+
+        .receipt-header {
+            background: white;
+            padding: 10px;
+            border-bottom: 1px solid #e0e0e0;
+            text-align: center;
+        }
+
+        .receipt-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 3px;
+        }
+
+        .receipt-details {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
+        }
+
+        .detail-item-card {
+            background: white;
+            border-radius: 6px;
+            padding: 8px;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .detail-item-image {
+            width: 40px;
+            height: 40px;
+            object-fit: contain;
+            border-radius: 4px;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .detail-item-image:hover {
+            transform: scale(1.1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+
+        .detail-item-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .detail-item-name {
+            font-weight: 500;
+            margin: 0 0 2px 0;
+            font-size: 12px;
+            line-height: 1.2;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .detail-item-category {
+            color: #6c757d;
+            font-size: 10px;
+            margin: 0 0 2px 0;
+        }
+
+        .detail-item-time {
+            color: #6c757d;
+            font-size: 10px;
+            margin: 0;
+        }
+
+        .detail-item-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 4px;
+        }
+
+        .detail-item-quantity {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .detail-item-qty-btn {
+            width: 20px;
+            height: 20px;
+            border: 1px solid var(--secondary);
+            background: none;
+            color: var(--secondary);
+            border-radius: 3px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .detail-item-qty-btn:hover {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .detail-item-qty-btn.delete {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .detail-item-qty-btn.delete:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        .detail-item-qty-number {
+            font-weight: 700;
+            min-width: 16px;
+            text-align: center;
+            font-size: 11px;
+        }
+
+        .detail-item-price {
+            font-weight: 700;
+            color: var(--secondary);
+            font-size: 12px;
+            text-align: right;
+            min-width: 60px;
+        }
+
+        /* Resumen */
+        .receipt-summary {
+            background: white;
+            padding: 10px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            font-size: 12px;
+        }
+
+        .summary-row.total {
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--secondary);
+            padding-top: 6px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        /* Botón de descuento */
+        .discount-btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 2px 6px;
+            cursor: pointer;
+            font-size: 10px;
+            margin-left: 8px;
+            transition: all 0.2s;
+        }
+
+        .discount-btn:hover {
+            background: #00a085;
+            transform: scale(1.05);
+        }
+
+        /* Modal de descuentos */
+        .discount-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .discount-modal.active {
+            display: flex;
+        }
+
+        .discount-content {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .discount-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .discount-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .discount-options {
+            display: grid;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .discount-option {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .discount-option:hover {
+            border-color: var(--accent);
+            background: #f8fffe;
+        }
+
+        .discount-option.selected {
+            border-color: var(--accent);
+            background: var(--accent);
+            color: white;
+        }
+
+        .discount-option-icon {
+            font-size: 20px;
+            margin-right: 12px;
+        }
+
+        .discount-option-text {
+            flex: 1;
+        }
+
+        .discount-option-title {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .discount-option-desc {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .custom-discount {
+            margin-top: 16px;
+            padding: 16px;
+            border: 2px dashed #e0e0e0;
+            border-radius: 8px;
+        }
+
+        .custom-discount input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .discount-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .discount-actions button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn-apply {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-cancel {
+            background: #f0f0f0;
+            color: #666;
+        }
+
+        /* Métodos de pago */
+        .payment-methods {
+            display: flex;
+            gap: 6px;
+            margin: 8px 0;
+        }
+
+        .payment-method-btn {
+            flex: 1;
+            padding: 8px 6px;
+            border: 1px solid #e0e0e0;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            font-size: 10px;
+        }
+
+        .payment-method-btn.active,
+        .payment-method-btn:hover {
+            border-color: var(--secondary);
+            background: var(--secondary);
+            color: white;
+        }
+
+        .close-sale-btn {
+            background: var(--success);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .close-sale-btn:hover {
+            background: #45a049;
+        }
+
+        .close-sale-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* Mensajes */
+        .message-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .message {
+            padding: 12px 20px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .message-success { background: var(--success); }
+        .message-error { background: var(--danger); }
+        .message-warning { background: var(--warning); color: #333; }
+        .message-info { background: var(--primary); }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .pos-root-layout { flex-direction: column; }
+            .sidebar-vertical { width: 100%; height: 60px; flex-direction: row; justify-content: center; }
+            .right-panel { width: 100%; height: 300px; }
+            .main-panel { height: calc(100vh - 360px); }
+        }
+    </style>
+</head>
+<body>
+  <div class="pos-root-layout">
+    <!-- Sidebar vertical solo iconos -->
+    <aside class="sidebar-vertical">
+              <button class="sidebar-icon" title="POS"><span class="icon-home"></span></button>
+        <button class="sidebar-icon" title="Órdenes"><span class="icon-history"></span></button>
+        <button class="sidebar-icon" title="Calendario"><span class="icon-calendar"></span></button>
+        <button class="sidebar-icon" title="Reportes"><span class="icon-chart"></span></button>
+        <button class="sidebar-icon" title="Ajustes"><span class="icon-settings"></span></button>
+    </aside>
+    
+    <!-- Panel central -->
+    <main class="main-panel">
+      <header class="main-header">
+        <div class="search-bar">
+          <span class="icon-search"></span>
+          <input type="text" id="search-product" placeholder="Buscar producto...">
+        </div>
+        <div class="user-profile">
+          <div class="user-avatar">👤</div>
+          <span class="user-name">Lavasmart</span>
+        </div>
+      </header>
+      
+      <section class="categories-bar">
+        <button class="category-btn active" data-category="all">Todos</button>
+        <button class="category-btn" data-category="Salas">Salas</button>
+        <button class="category-btn" data-category="Colchones">Colchones</button>
+        <button class="category-btn" data-category="Vehículos">Vehículos</button>
+        <button class="category-btn" data-category="Alfombras y Tapetes">Alfombras</button>
+        <button class="category-btn" data-category="Otros">Otros</button>
+        <button class="category-btn" data-category="Descuentos">Descuentos</button>
+        <button class="category-btn" data-category="Promociones">Promociones</button>
+      </section>
+      
+      <section class="products-grid" id="menu">
+        <!-- Aquí van los productos (cards) -->
+      </section>
+    </main>
+    
+    <!-- Panel derecho: recibo y totales -->
+    <aside class="right-panel">
+      <div class="receipt-header">
+        <h3 class="receipt-title">Recibo</h3>
+        <div class="receipt-info">
+          <span id="invoice-number"># 001</span>
+          <br>
+          <small id="receipt-date">Orden: 15/01/25, 7:10 p.m.</small>
+        </div>
+      </div>
+      
+      <div class="receipt-details" id="receipt-details">
+        <!-- Items del recibo aparecen aquí -->
+      </div>
+      
+      <div class="receipt-summary">
+        <div class="summary-row">
+          <span id="items-count">0 (Items)</span>
+          <span id="total-time">0 min</span>
+        </div>
+        <div class="summary-row">
+          <span>Subtotal (sin IVA):</span>
+          <span id="subtotal-summary">$0.00</span>
+        </div>
+        <div class="summary-row">
+          <span>Descuentos:</span>
+          <span id="discount-summary">$0.00</span>
+          <button class="discount-btn" onclick="showDiscountModal()" title="Aplicar descuento">
+            <span class="icon-discount">🎫</span>
+          </button>
+          <button class="discount-btn" onclick="clearDiscount()" title="Limpiar descuento" style="background: var(--danger); margin-left: 4px;">
+            <span class="icon-discount">❌</span>
+          </button>
+        </div>
+        <div class="summary-row" id="subtotal-after-discount-row" style="display: none;">
+          <span>Subtotal después descuento:</span>
+          <span id="subtotal-after-discount">$0.00</span>
+        </div>
+        <div class="summary-row">
+          <span>IVA (16%):</span>
+          <span id="tax-summary">$0.00</span>
+        </div>
+        <div class="summary-row total">
+          <span>Total:</span>
+          <span id="grandtotal-summary">$0.00</span>
+        </div>
+        
+        <div class="payment-methods">
+          <button class="payment-method-btn" id="pay-cash">
+            <span class="icon-cash"></span>
+            <span>Cash</span>
+          </button>
+          <button class="payment-method-btn active" id="pay-card">
+            <span class="icon-card"></span>
+            <span>Debit</span>
+          </button>
+          <button class="payment-method-btn" id="pay-qris">
+            <span class="icon-mobile"></span>
+            <span>QRIS</span>
+          </button>
+        </div>
+        
+        <button class="close-sale-btn" id="close-sale">Cerrar Venta</button>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Modal de Descuentos -->
+  <div class="discount-modal" id="discountModal">
+    <div class="discount-content">
+      <div class="discount-header">
+        <h3 class="discount-title">Aplicar Descuento sobre el Total</h3>
+        <button class="close-modal" onclick="closeDiscountModal()">×</button>
+      </div>
+      
+      <div class="discount-options">
+        <div class="discount-option" onclick="selectDiscount('percentage', 10)">
+          <span class="discount-option-icon">🎯</span>
+          <div class="discount-option-text">
+            <div class="discount-option-title">10% Descuento</div>
+            <div class="discount-option-desc">10% sobre el total (con IVA)</div>
+          </div>
+        </div>
+        
+        <div class="discount-option" onclick="selectDiscount('percentage', 15)">
+          <span class="discount-option-icon">🎉</span>
+          <div class="discount-option-text">
+            <div class="discount-option-title">15% Descuento</div>
+            <div class="discount-option-desc">15% sobre el total (con IVA)</div>
+          </div>
+        </div>
+        
+        <div class="discount-option" onclick="selectDiscount('percentage', 20)">
+          <span class="discount-option-icon">🏆</span>
+          <div class="discount-option-text">
+            <div class="discount-option-title">20% Descuento</div>
+            <div class="discount-option-desc">20% sobre el total (con IVA)</div>
+          </div>
+        </div>
+        
+        <div class="discount-option" onclick="selectDiscount('fixed', 100)">
+          <span class="discount-option-icon">💰</span>
+          <div class="discount-option-text">
+            <div class="discount-option-title">$100 Descuento</div>
+            <div class="discount-option-desc">$100 sobre el total (con IVA)</div>
+          </div>
+        </div>
+        
+        <div class="discount-option" onclick="selectDiscount('fixed', 200)">
+          <span class="discount-option-icon">💎</span>
+          <div class="discount-option-text">
+            <div class="discount-option-title">$200 Descuento</div>
+            <div class="discount-option-desc">$200 sobre el total (con IVA)</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="custom-discount">
+        <h4 style="margin: 0 0 8px 0; font-size: 14px;">Descuento Personalizado sobre el Total</h4>
+        <input type="number" id="customDiscountValue" placeholder="Ingresa el valor del descuento" min="0" step="0.01">
+        <select id="customDiscountType" style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;">
+          <option value="percentage">Porcentaje (%) sobre el total</option>
+          <option value="fixed">Monto fijo ($) sobre el total</option>
+        </select>
+      </div>
+      
+      <div class="discount-actions">
+        <button class="btn-cancel" onclick="closeDiscountModal()">Cancelar</button>
+        <button class="btn-apply" onclick="applyCustomDiscount()">Aplicar Descuento</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Datos de productos demo con imágenes más confiables
+    // Los precios ya incluyen IVA (16%), necesitamos calcular el precio base
+    const productosDemo = [
+      {sku: "001", description: "Sala Chica (3,2,1)", price: 950.00, taxRate: 0.16, image: "https://picsum.photos/300/300?random=1", tiempo: 35, category: "Salas"},
+      {sku: "002", description: "Sala Grande (+6p)", price: 950.00, taxRate: 0.16, image: "https://picsum.photos/300/300?random=2", tiempo: 40, category: "Salas"},
+      {sku: "003", description: "Sofá 2 Plazas", price: 750.00, taxRate: 0.16, image: "https://picsum.photos/300/300?random=3", tiempo: 20, category: "Salas"},
+      {sku: "004", description: "Sofá de 3 Plazas", price: 750.00, taxRate: 0.16, image: "https://picsum.photos/300/300?random=4", tiempo: 20, category: "Salas"},
+      {sku: "005", description: "Sofá Esquinera o en L Chica", price: 850.00, taxRate: 0.16, image: "https://picsum.photos/300/300?random=5", tiempo: 35, category: "Salas"},
+      {sku: "006", description: "Sofá Esquinera o L Mediana", price: 950.00, taxRate: 0.16, image: "https://picsum.photos/300/300?random=6", tiempo: 35, category: "Salas"},
+      {sku: "007", description: "Colchón Individual", price: 450.00, taxRate: 0.16, image: "https://picsum.photos/300/300?random=7", tiempo: 15, category: "Colchones"},
+      {sku: "008", description: "Colchón Matrimonial", price: 550.00, taxRate: 0.16, image: "https://picsum.photos/300/300?random=8", tiempo: 20, category: "Colchones"},
+      {sku: "009", description: "Colchón Queen Size", price: 650.00, taxRate: 0.16, image: "https://picsum.photos/300/300?random=9", tiempo: 25, category: "Colchones"},
+      {sku: "010", description: "Colchón King Size", price: 750.00, taxRate: 0.16, image: "https://picsum.photos/300/300?random=10", tiempo: 30, category: "Colchones"},
+      {sku: "011", description: "Auto Sedan", price: 450.00, taxRate: 0.16, image: "https://picsum.photos/300/300?random=11", tiempo: 45, category: "Vehículos"},
+      {sku: "012", description: "Auto SUV/Camioneta", price: 550.00, taxRate: 0.16, image: "https://picsum.photos/300/300?random=12", tiempo: 60, category: "Vehículos"},
+      {sku: "013", description: "Alfombra Pequeña", price: 250.00, taxRate: 0.16, image: "https://picsum.photos/300/300?random=13", tiempo: 15, category: "Alfombras y Tapetes"},
+      {sku: "014", description: "Alfombra Mediana", price: 350.00, taxRate: 0.16, image: "https://picsum.photos/300/300?random=14", tiempo: 25, category: "Alfombras y Tapetes"},
+      {sku: "015", description: "Alfombra Grande", price: 450.00, taxRate: 0.16, image: "https://picsum.photos/300/300?random=15", tiempo: 35, category: "Alfombras y Tapetes"},
+      {sku: "016", description: "Tapete de Auto", price: 150.00, taxRate: 0.16, image: "https://picsum.photos/300/300?random=16", tiempo: 10, category: "Alfombras y Tapetes"},
+      {sku: "017", description: "Servicio Express", price: 200.00, taxRate: 0.16, image: "https://picsum.photos/300/300?random=17", tiempo: 15, category: "Otros"},
+      {sku: "018", description: "Descuento 10%", price: -50.00, taxRate: 0.00, image: "https://picsum.photos/300/300?random=18", tiempo: 0, category: "Descuentos"},
+      {sku: "019", description: "Promo 2x1 Colchones", price: 550.00, taxRate: 0.16, image: "https://picsum.photos/300/300?random=19", tiempo: 40, category: "Promociones"},
+      {sku: "020", description: "Paquete Sala Completa", price: 1800.00, taxRate: 0.16, image: "https://picsum.photos/300/300?random=20", tiempo: 90, category: "Promociones"}
+    ];
+
+    // Estado de la orden
+    let orden = {
+      items: [],
+      invoiceNumber: 1,
+      payment: {
+        type: 'card',
+        amountPaid: 0
+      },
+      discount: {
+        type: null, // 'percentage' o 'fixed'
+        value: 0,
+        amount: 0
+      }
+    };
+
+    // Utilidades
+    function formatCurrency(amount) {
+      return new Intl.NumberFormat('es-MX', {
+        style: 'currency',
+        currency: 'MXN'
+      }).format(amount);
+    }
+
+    function roundToTwo(num) {
+      return Math.round((num + Number.EPSILON) * 100) / 100;
+    }
+
+    // Calcular precio base (sin IVA) desde precio con IVA incluido
+    function calculateBasePrice(priceWithTax, taxRate) {
+      return roundToTwo(priceWithTax / (1 + taxRate));
+    }
+
+    // Calcular IVA desde precio con IVA incluido
+    function calculateTaxAmount(priceWithTax, taxRate) {
+      const basePrice = calculateBasePrice(priceWithTax, taxRate);
+      return roundToTwo(priceWithTax - basePrice);
+    }
+
+    // Obtener icono según la categoría
+    function getCategoryIcon(category) {
+      const icons = {
+        'Salas': '🛋️',
+        'Colchones': '🛏️',
+        'Vehículos': '🚗',
+        'Alfombras y Tapetes': '🟫',
+        'Otros': '📦',
+        'Descuentos': '🎫',
+        'Promociones': '🏷️'
+      };
+      return icons[category] || '📦';
+    }
+
+    // Sistema de mensajes
+    function showMessage(message, type = 'info', duration = 3000) {
+      let container = document.querySelector('.message-container');
+      if (!container) {
+        container = document.createElement('div');
+        container.className = 'message-container';
+        document.body.appendChild(container);
+      }
+
+      const messageEl = document.createElement('div');
+      messageEl.className = `message message-${type}`;
+      messageEl.textContent = message;
+
+      container.appendChild(messageEl);
+
+      setTimeout(() => {
+        messageEl.style.animation = 'slideOut 0.3s ease-in forwards';
+        setTimeout(() => messageEl.remove(), 300);
+      }, duration);
+    }
+
+    // Validaciones
+    function validateOrder() {
+      if (orden.items.length === 0) {
+        showMessage('No hay productos en la orden', 'warning');
+        return false;
+      }
+      
+      const total = orden.items.reduce((total, item) => total + item.subtotal + item.tax, 0);
+      if (total <= 0) {
+        showMessage('El total de la orden debe ser mayor a $0', 'warning');
+        return false;
+      }
+      
+      return true;
+    }
+
+    // Estadísticas de la orden
+    function getOrderStats() {
+      const totalItems = orden.items.reduce((total, item) => total + item.quantity, 0);
+      const totalTime = orden.items.reduce((total, item) => total + (item.tiempo * item.quantity), 0);
+      const subtotal = orden.items.reduce((total, item) => total + item.subtotal, 0); // Sin IVA
+      
+      // Calcular IVA sobre el subtotal
+      const tax = roundToTwo(subtotal * 0.16);
+      
+      // Calcular total antes del descuento (subtotal + IVA)
+      const totalBeforeDiscount = subtotal + tax;
+      
+      // Calcular descuento sobre el total (incluyendo IVA)
+      let discountAmount = 0;
+      if (orden.discount.type === 'percentage') {
+        discountAmount = roundToTwo(totalBeforeDiscount * (orden.discount.value / 100));
+      } else if (orden.discount.type === 'fixed') {
+        discountAmount = Math.min(orden.discount.value, totalBeforeDiscount);
+      }
+      
+      // Total final después del descuento
+      const grandTotal = totalBeforeDiscount - discountAmount;
+      
+      return {
+        totalItems,
+        totalTime,
+        subtotal,
+        tax,
+        discount: discountAmount,
+        grandTotal
+      };
+    }
+
+    // Renderizar productos
+    function renderProducts() {
+      const menuContainer = document.getElementById('menu');
+      menuContainer.innerHTML = '';
+
+      const categoryActive = document.querySelector('.category-btn.active').getAttribute('data-category');
+      const searchTerm = document.getElementById('search-product').value.toLowerCase();
+
+      productosDemo.forEach(product => {
+        const matchesCategory = categoryActive === 'all' || product.category === categoryActive;
+        const matchesSearch = !searchTerm || product.description.toLowerCase().includes(searchTerm);
+
+        if (matchesCategory && matchesSearch) {
+          const card = document.createElement('div');
+          card.className = 'product-card';
+          
+          // Crear imagen con manejo de errores mejorado
+          const img = document.createElement('img');
+          img.src = product.image;
+          img.alt = product.description;
+          img.className = 'product-img';
+          
+          // Manejar error de imagen sin bucle infinito
+          img.onerror = function() {
+            if (!this.dataset.fallback) {
+              this.dataset.fallback = 'true';
+              // Crear una imagen SVG más atractiva con iconos según la categoría
+              const categoryIcon = getCategoryIcon(product.category);
+              this.src = `data:image/svg+xml;base64,${btoa(`
+                <svg width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="60" height="60" fill="#f8f9fa" stroke="#e9ecef" stroke-width="1"/>
+                  <text x="30" y="35" font-family="Arial, sans-serif" font-size="24" fill="#6c757d" text-anchor="middle">${categoryIcon}</text>
+                </svg>
+              `)}`;
+            }
+          };
+          
+          card.innerHTML = `
+            <div class="product-title" title="${product.description}">${product.description.length > 25 ? product.description.substring(0, 22) + '...' : product.description}</div>
+            <div class="product-time">⏱️ ${product.tiempo} min</div>
+            <div class="product-price">${formatCurrency(product.price)}</div>
+            <button class="add-to-bill-btn" onclick="addToOrder('${product.sku}')">Agregar</button>
+          `;
+          
+          // Insertar imagen al principio
+          card.insertBefore(img, card.firstChild);
+          menuContainer.appendChild(card);
+        }
+      });
+    }
+
+    // Agregar producto a la orden
+    function addToOrder(sku) {
+      const product = productosDemo.find(p => p.sku === sku);
+      if (!product) {
+        showMessage('Producto no encontrado', 'error');
+        return;
+      }
+
+      const existingItem = orden.items.find(item => item.sku === sku);
+      
+      if (existingItem) {
+        existingItem.quantity += 1;
+        // Calcular subtotal y IVA correctamente
+        const basePrice = calculateBasePrice(product.price, product.taxRate);
+        existingItem.subtotal = existingItem.quantity * basePrice;
+        existingItem.tax = roundToTwo(existingItem.quantity * calculateTaxAmount(product.price, product.taxRate));
+        showMessage(`Cantidad de "${product.description}" aumentada a ${existingItem.quantity}`, 'success', 2000);
+      } else {
+        // Calcular precio base e IVA para el nuevo item
+        const basePrice = calculateBasePrice(product.price, product.taxRate);
+        const taxAmount = calculateTaxAmount(product.price, product.taxRate);
+        
+        const newItem = {
+          sku: product.sku,
+          description: product.description,
+          price: product.price, // Precio con IVA incluido (para mostrar)
+          basePrice: basePrice, // Precio sin IVA (para cálculos)
+          taxRate: product.taxRate,
+          tiempo: product.tiempo,
+          image: product.image,
+          category: product.category,
+          quantity: 1,
+          subtotal: basePrice, // Subtotal sin IVA
+          tax: taxAmount // IVA calculado
+        };
+        orden.items.push(newItem);
+        showMessage(`"${product.description}" agregado a la orden`, 'success', 2000);
+      }
+
+      updateReceipt();
+      
+      // Efecto visual en el botón
+      const button = event.target;
+      button.style.transform = 'scale(0.95)';
+      setTimeout(() => {
+        button.style.transform = 'scale(1)';
+      }, 150);
+    }
+
+    // Actualizar cantidad
+    function updateQuantity(index, newQuantity) {
+      if (newQuantity <= 0) {
+        orden.items.splice(index, 1);
+      } else {
+        const item = orden.items[index];
+        const basePrice = calculateBasePrice(item.price, item.taxRate);
+        const taxAmount = calculateTaxAmount(item.price, item.taxRate);
+        
+        item.quantity = newQuantity;
+        item.subtotal = newQuantity * basePrice; // Subtotal sin IVA
+        item.tax = roundToTwo(newQuantity * taxAmount); // IVA calculado
+      }
+      updateReceipt();
+    }
+
+    // Eliminar item
+    function removeItem(index) {
+      orden.items.splice(index, 1);
+      updateReceipt();
+    }
+
+    // Actualizar recibo
+    function updateReceipt() {
+      const receiptDetails = document.getElementById('receipt-details');
+      receiptDetails.innerHTML = '';
+
+      orden.items.forEach((item, index) => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'detail-item-card';
+        
+        // Crear imagen con manejo de errores mejorado
+        const img = document.createElement('img');
+        img.src = item.image;
+        img.alt = item.description;
+        img.className = 'detail-item-image';
+        
+        // Manejar error de imagen sin bucle infinito
+        img.onerror = function() {
+          if (!this.dataset.fallback) {
+            this.dataset.fallback = 'true';
+            // Crear una imagen SVG más atractiva con iconos según la categoría
+            const categoryIcon = getCategoryIcon(item.category);
+            this.src = `data:image/svg+xml;base64,${btoa(`
+              <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="40" height="40" fill="#f8f9fa" stroke="#e9ecef" stroke-width="1"/>
+                <text x="20" y="25" font-family="Arial, sans-serif" font-size="16" fill="#6c757d" text-anchor="middle">${categoryIcon}</text>
+              </svg>
+            `)}`;
+          }
+        };
+        
+        itemDiv.innerHTML = `
+          <div class="detail-item-content">
+            <h4 class="detail-item-name">${item.description}</h4>
+            <p class="detail-item-category">${item.category}</p>
+            <p class="detail-item-time">⏱️ ${item.tiempo} min</p>
+            <div class="detail-item-controls">
+              <div class="detail-item-quantity">
+                <button class="detail-item-qty-btn" onclick="updateQuantity(${index}, ${item.quantity - 1})"><span class="icon-minus"></span></button>
+                <span class="detail-item-qty-number">${item.quantity}</span>
+                <button class="detail-item-qty-btn" onclick="updateQuantity(${index}, ${item.quantity + 1})"><span class="icon-plus"></span></button>
+              </div>
+            </div>
+          </div>
+          <div class="detail-item-price">
+            ${item.quantity > 1 ? `${item.quantity} x ${formatCurrency(item.price)}` : formatCurrency(item.subtotal)}
+          </div>
+          <button class="detail-item-qty-btn delete" onclick="removeItem(${index})" title="Eliminar">
+            <span class="icon-trash"></span>
+          </button>
+        `;
+        
+        // Insertar imagen al principio
+        itemDiv.insertBefore(img, itemDiv.firstChild);
+        receiptDetails.appendChild(itemDiv);
+      });
+
+      updateSummary();
+    }
+
+    // Actualizar resumen
+    function updateSummary() {
+      const totalItems = orden.items.reduce((total, item) => total + item.quantity, 0);
+      const totalTime = orden.items.reduce((total, item) => total + (item.tiempo * item.quantity), 0);
+      const subtotal = orden.items.reduce((total, item) => total + item.subtotal, 0); // Sin IVA
+      
+      // Calcular IVA sobre el subtotal
+      const tax = roundToTwo(subtotal * 0.16);
+      
+      // Calcular total antes del descuento (subtotal + IVA)
+      const totalBeforeDiscount = subtotal + tax;
+      
+      // Calcular descuento sobre el total (incluyendo IVA)
+      let discountAmount = 0;
+      if (orden.discount.type === 'percentage') {
+        discountAmount = roundToTwo(totalBeforeDiscount * (orden.discount.value / 100));
+      } else if (orden.discount.type === 'fixed') {
+        discountAmount = Math.min(orden.discount.value, totalBeforeDiscount);
+      }
+      orden.discount.amount = discountAmount;
+      
+      // Total final después del descuento
+      const grandTotal = totalBeforeDiscount - discountAmount;
+
+      document.getElementById('items-count').textContent = `${totalItems} (Items)`;
+      document.getElementById('total-time').textContent = `${totalTime} min`;
+      document.getElementById('subtotal-summary').textContent = formatCurrency(subtotal);
+      document.getElementById('discount-summary').textContent = formatCurrency(discountAmount);
+      document.getElementById('tax-summary').textContent = formatCurrency(tax);
+      document.getElementById('grandtotal-summary').textContent = formatCurrency(grandTotal);
+
+      // Mostrar/ocultar subtotal después del descuento (ya no necesario)
+      const subtotalAfterDiscountRow = document.getElementById('subtotal-after-discount-row');
+      subtotalAfterDiscountRow.style.display = 'none';
+
+      // Habilitar/deshabilitar botón de cerrar venta
+      const closeSaleBtn = document.getElementById('close-sale');
+      closeSaleBtn.disabled = orden.items.length === 0;
+    }
+
+    // Cambiar método de pago
+    function changePaymentMethod(method) {
+      document.querySelectorAll('.payment-method-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(`pay-${method}`).classList.add('active');
+      orden.payment.type = method;
+    }
+
+    // Cerrar venta
+    function closeSale() {
+      if (!validateOrder()) {
+        return;
+      }
+
+      const stats = getOrderStats();
+      const result = confirm(`¿Confirmar venta?\n\nResumen:\n- Items: ${stats.totalItems}\n- Tiempo estimado: ${stats.totalTime} min\n- Total: ${formatCurrency(stats.grandTotal)}\n- Método de pago: ${orden.payment.type.toUpperCase()}`);
+      
+      if (result) {
+        // Simular procesamiento
+        showMessage('Procesando venta...', 'info');
+        
+        setTimeout(() => {
+          // Guardar venta en localStorage para demo
+          const venta = {
+            id: Date.now(),
+            fecha: new Date().toISOString(),
+            numero: orden.invoiceNumber,
+            items: orden.items,
+            total: stats.grandTotal,
+            metodoPago: orden.payment.type,
+            stats: stats
+          };
+          
+          // Guardar en localStorage
+          const ventas = JSON.parse(localStorage.getItem('lavasmart_ventas') || '[]');
+          ventas.push(venta);
+          localStorage.setItem('lavasmart_ventas', JSON.stringify(ventas));
+          
+          showMessage('¡Venta completada exitosamente!', 'success');
+          
+          // Limpiar orden
+          orden.items = [];
+          orden.invoiceNumber++;
+          document.getElementById('invoice-number').textContent = `# ${orden.invoiceNumber.toString().padStart(3, '0')}`;
+          updateReceipt();
+          
+          // Actualizar fecha/hora
+          const now = new Date();
+          const fechaHora = now.toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' });
+          document.getElementById('receipt-date').textContent = `Orden: ${fechaHora}`;
+        }, 1000);
+      }
+    }
+
+    // Funciones adicionales
+    function showSalesHistory() {
+      const ventas = JSON.parse(localStorage.getItem('lavasmart_ventas') || '[]');
+      
+      if (ventas.length === 0) {
+        showMessage('No hay ventas registradas', 'info');
+        return;
+      }
+      
+      let historial = '📊 Historial de Ventas:\n\n';
+      ventas.slice(-5).reverse().forEach(venta => {
+        const fecha = new Date(venta.fecha).toLocaleString('es-MX');
+        historial += `#${venta.numero} - ${fecha}\n`;
+        historial += `Total: ${formatCurrency(venta.total)}\n`;
+        historial += `Items: ${venta.stats.totalItems}\n`;
+        historial += `Método: ${venta.metodoPago.toUpperCase()}\n\n`;
+      });
+      
+      alert(historial);
+    }
+
+    function showStats() {
+      const ventas = JSON.parse(localStorage.getItem('lavasmart_ventas') || '[]');
+      
+      if (ventas.length === 0) {
+        showMessage('No hay datos para mostrar estadísticas', 'info');
+        return;
+      }
+      
+      const totalVentas = ventas.length;
+      const totalIngresos = ventas.reduce((sum, v) => sum + v.total, 0);
+      const promedioVenta = totalIngresos / totalVentas;
+      
+      const stats = `📈 Estadísticas:\n\n`;
+      stats += `Total de ventas: ${totalVentas}\n`;
+      stats += `Ingresos totales: ${formatCurrency(totalIngresos)}\n`;
+      stats += `Promedio por venta: ${formatCurrency(promedioVenta)}\n`;
+      
+      alert(stats);
+    }
+
+    function clearAllData() {
+      if (confirm('¿Estás seguro de que quieres eliminar todos los datos? Esta acción no se puede deshacer.')) {
+        localStorage.removeItem('lavasmart_ventas');
+        showMessage('Todos los datos han sido eliminados', 'success');
+      }
+    }
+
+    // Funciones de descuentos
+    function showDiscountModal() {
+      if (orden.items.length === 0) {
+        showMessage('Agrega productos antes de aplicar descuentos', 'warning');
+        return;
+      }
+      document.getElementById('discountModal').classList.add('active');
+    }
+
+    function closeDiscountModal() {
+      document.getElementById('discountModal').classList.remove('active');
+    }
+
+    function selectDiscount(type, value) {
+      orden.discount.type = type;
+      orden.discount.value = value;
+      updateSummary();
+      closeDiscountModal();
+      
+      const discountText = type === 'percentage' ? `${value}%` : formatCurrency(value);
+      showMessage(`Descuento de ${discountText} aplicado`, 'success');
+    }
+
+    function applyCustomDiscount() {
+      const value = parseFloat(document.getElementById('customDiscountValue').value);
+      const type = document.getElementById('customDiscountType').value;
+      
+      if (!value || value <= 0) {
+        showMessage('Ingresa un valor válido para el descuento', 'warning');
+        return;
+      }
+      
+      if (type === 'percentage' && value > 100) {
+        showMessage('El descuento no puede ser mayor al 100%', 'warning');
+        return;
+      }
+      
+      selectDiscount(type, value);
+    }
+
+    // Limpiar descuento
+    function clearDiscount() {
+      orden.discount = { type: null, value: 0, amount: 0 };
+      updateSummary();
+      showMessage('Descuento eliminado', 'info');
+    }
+
+    // Event listeners
+    document.addEventListener('DOMContentLoaded', function() {
+      // Filtro de categorías
+      document.querySelectorAll('.category-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+          this.classList.add('active');
+          renderProducts();
+        });
+      });
+
+      // Búsqueda
+      document.getElementById('search-product').addEventListener('input', renderProducts);
+
+      // Métodos de pago
+      document.getElementById('pay-cash').addEventListener('click', () => changePaymentMethod('cash'));
+      document.getElementById('pay-card').addEventListener('click', () => changePaymentMethod('card'));
+      document.getElementById('pay-qris').addEventListener('click', () => changePaymentMethod('qris'));
+
+      // Cerrar venta
+      document.getElementById('close-sale').addEventListener('click', closeSale);
+
+      // Sidebar buttons
+      document.querySelectorAll('.sidebar-icon').forEach((btn, index) => {
+        btn.addEventListener('click', function() {
+          const actions = [
+            () => showMessage('Ya estás en el POS principal', 'info'),
+            () => showSalesHistory(),
+            () => showMessage('Calendario en desarrollo', 'info'),
+            () => showStats(),
+            () => {
+              const action = prompt('Acciones disponibles:\n1. Ver historial\n2. Ver estadísticas\n3. Limpiar datos\n\nIngresa el número:');
+              switch(action) {
+                case '1': showSalesHistory(); break;
+                case '2': showStats(); break;
+                case '3': clearAllData(); break;
+                default: showMessage('Opción no válida', 'warning');
+              }
+            }
+          ];
+          actions[index]();
+        });
+      });
+
+      // Renderizar productos iniciales
+      renderProducts();
+      updateSummary();
+
+      // Establecer fecha/hora actual
+      const now = new Date();
+      const fechaHora = now.toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' });
+      document.getElementById('receipt-date').textContent = `Orden: ${fechaHora}`;
+
+      // Mensaje de bienvenida
+      setTimeout(() => {
+        showMessage('¡Bienvenido al POS Lavasmart!', 'success');
+      }, 500);
+    });
+  </script>
+</body>
+</html> 
